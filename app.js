@@ -3,6 +3,7 @@ var userServiceUUID = "eb03a1e1663c414ea8126f8a94cdfb35";
 var userCharacteristicUUID = "4a3c42c4de114357bfbef40d612c1ffc";
 var nonceUUID = "0faba94acf64400289b66ce5088f18cb";
 var keyUUID = "b09ef2475b9241678b9545d8193f7ea3";
+var userKey = "";
 var activePeripherals = {};
 
 function startScanning() {
@@ -33,12 +34,12 @@ noble.on('discover', function(peripheral) {
 
 	noble.stopScanning();
 
-	peripheral.on('connect', function() {
+	peripheral.once('connect', function() {
 		console.log('on -> connect');
 		this.updateRssi();
 	});
 
-	peripheral.on('disconnect', function() {
+	peripheral.once('disconnect', function() {
 
 		for (var serviceID in peripheral["services"]) {
 			var service = peripheral["services"][serviceID]
@@ -46,9 +47,10 @@ noble.on('discover', function(peripheral) {
 				for (var characteristicID in service["characteristics"]) {
 					characteristic = service["characteristics"][characteristicID];
 					if (characteristic["uuid"] === userCharacteristicUUID) {
-						console.log("Deleting " + characteristic["_peripheralUuid"])
-						delete activePeripherals[characteristic["_peripheralUuid"]]
-						console.log(activePeripherals)
+						console.log("Deleting " + characteristic["_peripheralUuid"]);
+						console.log(activePeripherals);
+						delete activePeripherals[characteristic["_peripheralUuid"]];
+						console.log(activePeripherals);
 					}
 				}
 			}
@@ -60,15 +62,17 @@ noble.on('discover', function(peripheral) {
 		startScanning();
 	});
 
-	peripheral.on('rssiUpdate', function(rssi) {
+	peripheral.once('rssiUpdate', function(rssi) {
 		console.log('on -> RSSI update ' + rssi);
 		this.discoverServices();
 	});
 
-	peripheral.on('servicesDiscover', function(services) {
+	peripheral.once('servicesDiscover', function(services) {
 		for (var serviceID in services) {
+
 			service = services[serviceID];
 			if (service["uuid"] === userServiceUUID) {
+
 				service.on('characteristicsDiscover', function(characteristics) {
 					for (var characteristicID in characteristics) {
 						characteristic = characteristics[characteristicID];
@@ -77,8 +81,6 @@ noble.on('discover', function(peripheral) {
 								console.log('on -> characteristic read ' + data + ' ' + isNotification);
 								activePeripherals[peripheral["uuid"]] = data;
 								console.log(activePeripherals)
-								// Found a new peripheral, with ID data
-								console.log(data);
 							});
 
 							characteristic.read();
@@ -106,10 +108,15 @@ noble.on('discover', function(peripheral) {
 
 							characteristic.on('notify', function(state) {
 								console.log('on -> characteristic notify ' + state);
+								userKey = "";
 							});
 
 							characteristic.on('read', function(data, isNotification) {
-								console.log('on -> characteristic read ' + data + ' ' + isNotification);
+								if (data.toString('hex') == "04") {
+									console.log("Final user key: " + userKey);
+								} else {
+									userKey += data;
+								}
 							});					
 						}
 					}
@@ -118,6 +125,7 @@ noble.on('discover', function(peripheral) {
 			}
 		}
 	});
+
 	peripheral.connect();
 });
 
