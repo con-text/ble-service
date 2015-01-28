@@ -1,4 +1,9 @@
 var noble = require('noble');
+var argv = require('yargs')
+					.usage('Usage: $0')
+					.describe('p', 'Print out the advertising packets')
+					.describe('v', 'Be verbose about BLE events (not the advertising packets)')
+					.argv;
 var userServiceUUID = "eb03a1e1663c414ea8126f8a94cdfb35";
 var userCharacteristicUUID = "4a3c42c4de114357bfbef40d612c1ffc";
 var nonceUUID = "0faba94acf64400289b66ce5088f18cb";
@@ -13,8 +18,15 @@ function startScanning() {
 	noble.startScanning(serviceUUIDs, allowDuplicates); // particular UUID's
 }
 
+function printBLEMessage(message)
+{
+	if (argv.v == true) {
+		console.log(message);
+	}
+}
+
 noble.on('stateChange', function(state) {
-	console.log('on -> stateChange: ' + state);
+	printBLEMessage('on -> stateChange: ' + state);
 
 	if (state === 'poweredOn') startScanning();
 	else noble.stopScanning();
@@ -22,20 +34,20 @@ noble.on('stateChange', function(state) {
 });
 
 noble.on('scanStart', function() {
-	console.log('on -> scanStart');
+	printBLEMessage('on -> scanStart');
 });
 
 noble.on('scanStop', function() {
-	console.log('on -> scanStop');
+	printBLEMessage('on -> scanStop');
 });
 
 noble.on('discover', function(peripheral) {
-	console.log('on -> discover: ' + peripheral);
+	if (argv.p == true) console.log('on -> discover: ' + peripheral);
 
 	noble.stopScanning();
 
 	peripheral.once('connect', function() {
-		console.log('on -> connect');
+		printBLEMessage('on -> connect');
 		this.updateRssi();
 	});
 
@@ -56,14 +68,14 @@ noble.on('discover', function(peripheral) {
 			}
 		}
 
-		console.log('on -> disconnect');
+		printBLEMessage('on -> disconnect');
 
-		console.log("Start scanning again")
+		printBLEMessage("Start scanning again")
 		startScanning();
 	});
 
 	peripheral.once('rssiUpdate', function(rssi) {
-		console.log('on -> RSSI update ' + rssi);
+		printBLEMessage('on -> RSSI update ' + rssi);
 		this.discoverServices();
 	});
 
@@ -78,7 +90,7 @@ noble.on('discover', function(peripheral) {
 						characteristic = characteristics[characteristicID];
 						if (characteristic["uuid"] === userCharacteristicUUID) {							
 							characteristic.on('read', function(data, isNotification) {
-								console.log('on -> characteristic read ' + data + ' ' + isNotification);
+								printBLEMessage('on -> characteristic read ' + data + ' ' + isNotification);
 								activePeripherals[peripheral["uuid"]] = data;
 								console.log(activePeripherals)
 							});
@@ -87,7 +99,7 @@ noble.on('discover', function(peripheral) {
 
 						} else if (characteristic["uuid"] === nonceUUID) {
 							characteristic.on('write', function() {
-								console.log('on -> characteristic write ');
+								printBLEMessage('on -> characteristic write ');
 							});
 							var nonceString = makeNonce();
 							var nonceValue = new Buffer(nonceString, "utf-8");
@@ -96,18 +108,18 @@ noble.on('discover', function(peripheral) {
 
 							characteristic.write(nonceValue, function(err) {
 								if (err) {
-									console.log("Error writing value " + err);
+									printBLEMessage("Error writing value " + err);
 								}
 							});
 						} else if (characteristic["uuid"] === keyUUID) {
 							characteristic.notify(true, function(err) {
 								if (err) {
-									console.log("Error subscribing to notification " + err);
+									printBLEMessage("Error subscribing to notification " + err);
 								}
 							});
 
 							characteristic.on('notify', function(state) {
-								console.log('on -> characteristic notify ' + state);
+								printBLEMessage('on -> characteristic notify ' + state);
 								userKey = "";
 							});
 
