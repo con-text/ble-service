@@ -21,6 +21,8 @@ var locked = 0;
 var readChannel = null;
 var writeChannel = null;
 
+var readString = "";
+
 // Shim for IE8 Date.now
 if (!Date.now) {
     Date.now = function() { return new Date().getTime(); }
@@ -149,58 +151,49 @@ noble.on('scanStop', function() {
 	printBLEMessage('on -> scanStop');
 });
 
+var onCharacteristicsDiscoveredCallback = function(characteristics) {
+	for (var characteristicID in characteristics) {
+		characteristic = characteristics[characteristicID];
+		if (characteristic["uuid"] === readCharacteristicUUID) {			
+			readChannel = characteristic;
+			readChannel.notify(true);
+			readChannel.on('read', onReadMessage);
+		} else if (characteristic["uuid"] === writeCharacteristicUUID) {
+		/*	characteristic.notify(true, function(err) {
+				if (err) {
+					printBLEMessage("Error subscribing to notification " + err);
+				}
+			});
+
+			characteristic.on('notify', function(state) {
+				printBLEMessage('on -> characteristic notify ' + state);
+				userKey = "";
+			});
+
+			characteristic.on('read', function(data, isNotification) {
+				if (data.toString('hex') == "04") {
+					console.log("Final user key: " + userKey);
+					locked = 0;
+					peripheral.disconnect();
+				} else {
+					userKey += data;
+				}
+			});		*/
+			writeChannel = characteristic;
+		//	writeChannel.write(new Buffer("LOL", "utf-8"));
+			//sendMessage("9AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F05");
+		}
+	}
+};
+
 var onServiceDiscoveredCallback = function(services) {
 	for (var serviceID in services) {
 		service = services[serviceID];
 		if (service["uuid"] === userServiceUUID) {
-			service.on('characteristicsDiscover', function(characteristics) {
-				for (var characteristicID in characteristics) {
-					characteristic = characteristics[characteristicID];
-					if (characteristic["uuid"] === readCharacteristicUUID) {
-					/*	characteristic.on('write', function() {
-							printBLEMessage('on -> characteristic write ');
-						});
-						
-						var nonceString = makeNonce();
-						var nonceValue = new Buffer(nonceString, "utf-8");
-
-						console.log("Sending Nonce " + nonceString);
-
-						characteristic.write(nonceValue, function(err) {
-							if (err) {
-								printBLEMessage("Error writing value " + err);
-							}
-						});*/
-						readChannel = characteristic;
-						readChannel.on('read', function(data, isNotification) {
-							console.log(data);
-						});
-					} else if (characteristic["uuid"] === writeCharacteristicUUID) {
-					/*	characteristic.notify(true, function(err) {
-							if (err) {
-								printBLEMessage("Error subscribing to notification " + err);
-							}
-						});
-
-						characteristic.on('notify', function(state) {
-							printBLEMessage('on -> characteristic notify ' + state);
-							userKey = "";
-						});
-
-						characteristic.on('read', function(data, isNotification) {
-							if (data.toString('hex') == "04") {
-								console.log("Final user key: " + userKey);
-								locked = 0;
-								peripheral.disconnect();
-							} else {
-								userKey += data;
-							}
-						});		*/
-						writeChannel = characteristic;
-					}
-				}
-			});
-		service.discoverCharacteristics();
+			service.on('characteristicsDiscover', onCharacteristicsDiscoveredCallback);
+			
+			// Discover the characteristics
+			service.discoverCharacteristics();
 		}
 	}
 };
@@ -262,7 +255,7 @@ function makeNonce()
     var text = "";
     var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-    for( var i=0; i < 5; i++ )
+    for(var i = 0; i < 5; i++ )
         text += possible.charAt(Math.floor(Math.random() * possible.length));
 
     return text;
@@ -272,3 +265,61 @@ function getUserUUID(peripheral)
 {
 	return peripheral.advertisement.manufacturerData.slice(2).toString();
 }
+
+function sendMessage(message) {
+	if (writeChannel != null) {
+		// Send the first packet
+		var currentSubMessage = "1";
+		currentSubMessage += message.substr(0, 19);
+		rawWrite(currentSubMessage);
+
+		// Get the message length
+		var messagesToSend = Math.ceil(message.length / 19.0);
+
+		for (var i = 1; i < messagesToSend; i++) {
+			// Create the data packet
+			currentSubMessage = "2";
+			currentSubMessage += message.substr(i * 19, 19);
+			rawWrite(currentSubMessage);
+		}
+
+		// Send EOM
+		currentSubMessage = "3";
+		rawWrite(currentSubMessage);
+	}
+}
+
+function rawWrite(message) {
+	if (writeChannel != null) {
+		var bufferString = new Buffer(message, "utf-8");
+		writeChannel.write(bufferString);
+		console.log("Sending message: " + message);
+	}
+}
+
+function readMessage(message) {
+	console.log(message);
+}
+
+var onReadMessage = function rawReadMessage(data, isNotification) {
+
+	var dataString = data.toString();
+
+	if(dataString[0] == '1') {
+		readString = "";
+		for (var i = 1; i < dataString.length; i++) {
+			readString += dataString[i];
+		}
+	}
+
+	if(dataString[0] == '2') {
+		for (var i = 1; i < dataString.length; i++) {
+			readString += dataString[i];
+		}
+	}
+
+	if(dataString[0] == '3') {
+		if (readString != "") readMessage(readString);
+	}
+
+};
