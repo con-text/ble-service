@@ -1,5 +1,6 @@
 // Libraries
 var noble = require('noble');
+var net = require('net');
 var argv = require('yargs')
 					.usage('Usage: $0')
 					.describe('p', 'Print out the advertising packets')
@@ -17,42 +18,78 @@ var activePeripherals = {};
 var needsCheckingQueue = [];
 var isScanning = false;
 var locked = 0;
-
 var readChannel = null;
 var writeChannel = null;
 
+// Shim for IE8 Date.now
 if (!Date.now) {
     Date.now = function() { return new Date().getTime(); }
 }
 
-// Check active devices are still around
-setInterval(function(){
+// Set up socket
+var server = net.createServer({allowHalfOpen: true}, function(socket) { 
 
-	console.log("Current active users: " + JSON.stringify(activePeripherals))
-	console.log("Current stale users: " + JSON.stringify(needsCheckingQueue))
+	// Check active devices are still around
+	setInterval(function(){
+	
+		console.log("Current active users: " + JSON.stringify(activePeripherals))
+		console.log("Current stale users: " + JSON.stringify(needsCheckingQueue))
 
-	for (var peripheralKey in activePeripherals) {
-
-		// If we haven't seen a device in 15 seconds look for it again
-		// otherwise if it hasn't been seen in 60 seconds delete it
-		if ((activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 15000)) 
-			&& activePeripherals[peripheralKey]["lastConnectionTime"] > (Date.now() - 60000)) {
-
-			// Is it already in the queue?
-			for (var i = 0; i < needsCheckingQueue.length; i++) {
-				if (needsCheckingQueue[i][0] == peripheralKey) return;
-			}
-
-			needsCheckingQueue.push([peripheralKey, activePeripherals[peripheralKey]])
-		} else if (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 60000)) {
-			console.log("Deleting " + peripheralKey + " at " + Date.now());
-			delete activePeripherals[peripheralKey];
-			removePeripheralFromChecking(peripheralKey);
+		if(socket.writable) {
+			socket.write(JSON.stringify(activePeripheralsToUserData()))
+		} else {
+			socket.end();
 		}
+	
+		for (var peripheralKey in activePeripherals) {
+	
+			if ((activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 15000)) 
+				&& activePeripherals[peripheralKey]["lastConnectionTime"] > (Date.now() - 60000)) {
+	
+				// Is it already in the queue?
+				for (var i = 0; i < needsCheckingQueue.length; i++) {
+					if (needsCheckingQueue[i][0] == peripheralKey) return;
+				}
+	
+				needsCheckingQueue.push([peripheralKey, activePeripherals[peripheralKey]])
+			} else if (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 60000)) {
+				console.log("Deleting " + peripheralKey + " at " + Date.now());
+				delete activePeripherals[peripheralKey];
+				removePeripheralFromChecking(peripheralKey);
+			}
+	
+		}
+	
+	},5000);
 
+	socket.on('end', function() {
+		console.log('client disconnected');
+	});
+ 
+	socket.on('error', function(err) {
+		console.log("Error occured", err);
+	});
+	
+	socket.pipe(socket);
+
+});
+
+var port = 5001;
+ 
+server.listen(port, function () {
+	console.log("Listening on " + port)
+});
+
+function activePeripheralsToUserData() {
+	data = {};
+	data["clients"] = [];
+
+	for (var peripheral in activePeripherals) {
+		data["clients"].push({id: peripheral, name: activePeripherals[peripheral]["name"]})
 	}
 
-},5000);
+	return data;
+}
 
 function doesPeripheralNeedChecking(uuid) {
 	for (var i = 0; i < needsCheckingQueue.length; i++) {
