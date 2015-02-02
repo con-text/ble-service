@@ -135,6 +135,9 @@ var onServiceDiscoveredCallback = function(services) {
 							}
 						});*/
 						readChannel = characteristic;
+						readChannel.on('read', function(data, isNotification) {
+							console.log(data);
+						});
 					} else if (characteristic["uuid"] === writeCharacteristicUUID) {
 					/*	characteristic.notify(true, function(err) {
 							if (err) {
