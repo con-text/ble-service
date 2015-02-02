@@ -159,26 +159,6 @@ var onCharacteristicsDiscoveredCallback = function(characteristics) {
 			readChannel.notify(true);
 			readChannel.on('read', onReadMessage);
 		} else if (characteristic["uuid"] === writeCharacteristicUUID) {
-		/*	characteristic.notify(true, function(err) {
-				if (err) {
-					printBLEMessage("Error subscribing to notification " + err);
-				}
-			});
-
-			characteristic.on('notify', function(state) {
-				printBLEMessage('on -> characteristic notify ' + state);
-				userKey = "";
-			});
-
-			characteristic.on('read', function(data, isNotification) {
-				if (data.toString('hex') == "04") {
-					console.log("Final user key: " + userKey);
-					locked = 0;
-					peripheral.disconnect();
-				} else {
-					userKey += data;
-				}
-			});		*/
 			writeChannel = characteristic;
 		//	writeChannel.write(new Buffer("LOL", "utf-8"));
 			//sendMessage("9AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F05");
@@ -299,6 +279,9 @@ function rawWrite(message) {
 
 function readMessage(message) {
 	console.log(message);
+	if (message == "9AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F05") {
+		console.log("SUCCESS!");
+	}
 }
 
 var onReadMessage = function rawReadMessage(data, isNotification) {
