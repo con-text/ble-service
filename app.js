@@ -1,11 +1,15 @@
 // Libraries
+var machina = require('machina');
+var crypto = require('crypto');
 var noble = require('noble');
 var net = require('net');
+var request = require('request');
 var argv = require('yargs')
 					.usage('Usage: $0')
 					.describe('p', 'Print out the advertising packets')
 					.describe('v', 'Be verbose about BLE events (not the advertising packets)')
 					.argv;
+
 // Constants
 var userServiceUUID = "2220";
 var readCharacteristicUUID = "2221";
@@ -25,9 +29,212 @@ var readString = "";
 
 // Shim for IE8 Date.now
 if (!Date.now) {
-    Date.now = function() { return new Date().getTime(); }
+	Date.now = function() { return new Date().getTime(); }
 }
 
+
+/*
+Handshaking state machine
+Authenticates the wearable and vice versa
+*/
+
+var handshake = new machina.Fsm( {
+ 
+	initialize: function( options ) {
+	   
+	},
+ 
+	namespace: "handshake",
+	initialState: "uninitialized",
+	wearableID: "",
+	wearableData: "",
+	ourBlock: "",
+	encryptedBlockFromOracle: "",
+	encryptedBlockFromWearable: "",
+ 
+	states: {
+		uninitialized: {
+			"*": function() {
+				this.deferUntilTransition();
+				this.transition( "discovery" );
+			}
+		},
+		discovery: {
+
+			// In discovery state, find devices to connect to
+
+			_onEnter: function() {
+				console.log("---In discovery state");
+			},
+			connectedToWearable: function(uuid) {
+
+				// Receive a plaintext block from the wearable
+				console.log("---Changing to connected state with " + uuid);
+				this.wearableID = uuid;
+				this.transition( "connected" );
+			}
+		},
+		connected: {
+
+			// In connected state, await a block from wearable to begin handshaking
+			// If we don't receive any data from the wearable after some time, we should timeout
+			// and return back to discovery mode
+
+			_onEnter: function() {
+				console.log("---In connected state with " + this.wearableID);
+			},
+
+			receiveDataFromWearable: function(block) {
+
+				// Receive a plaintext block from the wearable
+				console.log("---Received plaintext block from wearable:");
+				console.log(block);
+				this.wearableData = block;
+				this.transition( "encryptBlockViaOracle" );
+
+			}
+		},
+		encryptBlockViaOracle: {
+
+			// Send uuid + random block to Oracle
+			// Recieve back an encrypted block
+
+			_onEnter: function() {
+				console.log("---In encryptBlockViaOracle State");
+				encryptBlock(this.wearableID, this.wearableData);
+			},
+			receiveEncryptedBlockFromOracle: function(block) {
+
+				// Receive an encrypted block back from Oracle
+				console.log("---Received encrypted block from oracle:");
+				console.log(block);
+				this.encryptedBlockFromOracle = block;
+				this.transition( "sendBlocksToWearable" );
+
+			}
+		},
+		sendBlocksToWearable: {
+
+			// Generate our own random block
+			// Send new block alongside Oracle-encrypted block to wearable
+
+			_onEnter: function() {
+				console.log("---In sendBlocksToWearable State");
+
+				// generate random passphrase binary data
+				this.ourBlock = crypto.randomBytes(32);
+				console.log("---Sending two messages to the device:");
+				console.log(this.ourBlock.toString('hex'));
+				console.log(this.encryptedBlockFromOracle);
+				//sendMessage(randomBlock)
+				//sendMessage(this.encryptedBlockFromOracle)
+			},
+
+			receiveDataFromWearable: function(encryptedBlock) {
+
+				// Receive the wearable's encrypted version of our random block
+				// Need to decrypt it for comparison
+				// Might contain an error if we weren't authenticated by them succesfully
+
+				console.log("---Received encrypted block from wearable.");
+				console.log(encryptedBlock);
+				this.encryptedBlockFromWearable = encryptedBlock;
+				this.transition( "decryptBlockViaOracle" );
+			}
+		},	
+		decryptBlockViaOracle: {
+
+			// Send uuid + encrypted block to Oracle for decryption
+			// With the result, check it matches the plain block we sent to the wearable
+
+			_onEnter: function() {
+				console.log("---In decryptBlockViaOracle State");
+				decryptBlock(this.wearableID, this.encryptedBlockFromWearable);
+			},
+			receiveDecryptedBlockFromOracle: function(decryptedBlock) {
+
+				// Receive a decrypted block back from Oracle
+				console.log("---Received encrypted block from oracle.");
+				console.log(decryptedBlock);
+
+				if (decryptedBlock == this.ourBlock) {
+					this.transition( "successfulHandshake" );
+				} else {
+					this.transition( "unsuccessfulHandshake" );
+				}
+
+			}
+		},
+		successfulHandshake: {
+
+			// Authentication was successful on both ends
+
+			_onEnter: function() {
+				console.log("---In successfulHandshake State");
+			},
+			_onExit: function() {
+			}
+		},
+		unsuccessfulHandshake: {
+
+			// Authentication failed
+
+			_onEnter: function() {
+				console.log("---In unsuccessfulHandshake State");
+			},
+			_onExit: function() {
+			}
+		}
+	},
+ 
+	reset: function() {
+		this.wearableID = "";
+		this.wearableData = "";
+		this.ourBlock = "";
+		this.encryptedBlockFromOracle = "";
+		this.encryptedBlockFromWearable = "";
+		this.handle( "_reset" );
+	},
+
+	connectedToWearable: function(uuid) {
+		this.handle( "connectedToWearable", uuid );
+	},
+
+	receiveDataFromWearable: function(block) {
+		this.handle("receiveDataFromWearable", block );
+	},
+
+	receiveEncryptedBlockFromOracle: function(block) {
+		this.handle( "receiveEncryptedBlockFromOracle", block );
+	},
+
+	receiveDecryptedBlockFromOracle: function(block) {
+		this.handle( "receiveDecryptedBlockFromOracle", block );
+	},	
+
+} );
+
+
+// Encrypt a block using the Oracle
+function encryptBlock(uuid, plaintext) {
+	request('http://contexte.herokuapp.com/auth/stage1/' + uuid + '/' + plaintext, function (error, response, body) {
+		if (!error && response.statusCode == 200) {
+			handshake.receiveEncryptedBlockFromOracle(body);
+		}
+	});
+}
+
+// Decrypt a block using the Oracle
+function decryptBlock(uuid, ciphertext) {
+	request('http://contexte.herokuapp.com/auth/stage2/' + uuid + '/' + plaintext, function (error, response, body) {
+		if (!error && response.statusCode == 200) {
+			handshake.receiveDecryptedBlockFromOracle(body);
+		}
+	});
+}
+
+
+// Simulate data for the front-end
 function getMockData() {
 
 	// Some mock users
@@ -40,7 +247,6 @@ function getMockData() {
 
 	return users;
 }
-
 
 // From http://stackoverflow.com/questions/11935175/sampling-a-random-subset-from-an-array
 function getRandomSubarray(arr, size) {
@@ -58,7 +264,7 @@ function getRandomInt(min, max) {
 		return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// Set up socket
+// Set up socket to front-end
 var server = net.createServer({allowHalfOpen: true}, function(socket) {
 
 	var useMockData = false;
@@ -78,8 +284,6 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 
 		console.log("Current active users: " + JSON.stringify(activePeripherals))
 		console.log("Current stale users: " + JSON.stringify(needsCheckingQueue))
-
-
 
 		if(useMockData) {
 
@@ -104,7 +308,7 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 			if(socket.writable) {
 				socket.write(JSON.stringify(activePeripheralsToUserData()))
 			} else {
-			socket.end();
+				socket.end();
 			}
 
 			for (var peripheralKey in activePeripherals) {
@@ -223,7 +427,7 @@ var onCharacteristicsDiscoveredCallback = function(characteristics) {
 			readChannel.on('read', onReadMessage);
 		} else if (characteristic["uuid"] === writeCharacteristicUUID) {
 			writeChannel = characteristic;
-		//	writeChannel.write(new Buffer("LOL", "utf-8"));
+			//writeChannel.write(new Buffer("LOL", "utf-8"));
 			//sendMessage("9AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F05");
 		}
 	}
@@ -265,6 +469,7 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 			writeChannel = null;
 
 			printBLEMessage("Disconnected....Starting to scan again")
+			handshake.reset();
 			startScanning();
 		});
 
@@ -281,6 +486,8 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 		peripheral.connect(function(err) {
 			if (err) {
 				console.log(err);
+			} else {
+				handshake.connectedToWearable(getUserUUID(peripheral));
 			}
 		});
 	} else {
@@ -295,13 +502,13 @@ noble.on('discover', onDeviceDiscoveredCallback);
 // http://stackoverflow.com/questions/1349404/generate-a-string-of-5-random-characters-in-javascript
 function makeNonce()
 {
-    var text = "";
-    var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+	var text = "";
+	var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-    for(var i = 0; i < 5; i++ )
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
+	for(var i = 0; i < 5; i++ )
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
 
-    return text;
+	return text;
 }
 
 function getUserUUID(peripheral)
@@ -341,10 +548,8 @@ function rawWrite(message) {
 }
 
 function readMessage(message) {
-	console.log(message);
-	if (message == "9AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F05") {
-		console.log("SUCCESS!");
-	}
+	//console.log(message);
+	handshake.receiveDataFromWearable(message);
 }
 
 var onReadMessage = function rawReadMessage(data, isNotification) {

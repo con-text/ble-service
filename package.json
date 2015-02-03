@@ -4,7 +4,10 @@
   "description": "",
   "main": "app.js",
   "dependencies": {
+    "crypto": "0.0.3",
+    "machina": "^1.0.0-1",
     "noble": "^0.3.7",
+    "request": "^2.53.0",
     "yargs": "^1.3.3"
   },
   "devDependencies": {},
