@@ -7,10 +7,10 @@ var argv = require('yargs')
 					.describe('v', 'Be verbose about BLE events (not the advertising packets)')
 					.argv;
 // Constants
-var userServiceUUID = "eb03a1e1663c414ea8126f8a94cdfb35";
-var userCharacteristicUUID = "4a3c42c4de114357bfbef40d612c1ffc";
-var nonceUUID = "0faba94acf64400289b66ce5088f18cb";
-var keyUUID = "b09ef2475b9241678b9545d8193f7ea3";
+var userServiceUUID = "2220";
+var readCharacteristicUUID = "2221";
+var writeCharacteristicUUID = "2222";
+var disconnectCharacteristicUUID = "2223";
 
 // Variables
 var userKey = "";
@@ -18,6 +18,10 @@ var activePeripherals = {};
 var needsCheckingQueue = [];
 var isScanning = false;
 var locked = 0;
+var readChannel = null;
+var writeChannel = null;
+
+var readString = "";
 
 // Shim for IE8 Date.now
 if (!Date.now) {
@@ -100,12 +104,13 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 			if(socket.writable) {
 				socket.write(JSON.stringify(activePeripheralsToUserData()))
 			} else {
-				socket.end();
+			socket.end();
 			}
 
 			for (var peripheralKey in activePeripherals) {
 
-				if ( (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 15000)) && activePeripherals[peripheralKey]["lastConnectionTime"] > (Date.now() - 60000) ) {
+				if ((activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 15000))
+					&& activePeripherals[peripheralKey]["lastConnectionTime"] > (Date.now() - 60000)) {
 
 					// Is it already in the queue?
 					for (var i = 0; i < needsCheckingQueue.length; i++) {
@@ -113,17 +118,13 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 					}
 
 					needsCheckingQueue.push([peripheralKey, activePeripherals[peripheralKey]])
-				}
-
-				else if (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 60000)) {
+				} else if (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 60000)) {
 					console.log("Deleting " + peripheralKey + " at " + Date.now());
 					delete activePeripherals[peripheralKey];
 					removePeripheralFromChecking(peripheralKey);
 				}
-
 			}
 		}
-
 	}, updateInterval);
 
 	socket.on('end', function() {
@@ -213,9 +214,36 @@ noble.on('scanStop', function() {
 	printBLEMessage('on -> scanStop');
 });
 
-noble.on('discover', function(peripheral) {
+var onCharacteristicsDiscoveredCallback = function(characteristics) {
+	for (var characteristicID in characteristics) {
+		characteristic = characteristics[characteristicID];
+		if (characteristic["uuid"] === readCharacteristicUUID) {
+			readChannel = characteristic;
+			readChannel.notify(true);
+			readChannel.on('read', onReadMessage);
+		} else if (characteristic["uuid"] === writeCharacteristicUUID) {
+			writeChannel = characteristic;
+		//	writeChannel.write(new Buffer("LOL", "utf-8"));
+			//sendMessage("9AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F05");
+		}
+	}
+};
 
-	if (argv.p == true) console.log('on -> discover: ' + peripheral);
+var onServiceDiscoveredCallback = function(services) {
+	for (var serviceID in services) {
+		service = services[serviceID];
+		if (service["uuid"] === userServiceUUID) {
+			service.on('characteristicsDiscover', onCharacteristicsDiscoveredCallback);
+
+			// Discover the characteristics
+			service.discoverCharacteristics();
+		}
+	}
+};
+
+var onDeviceDiscoveredCallback = function(peripheral) {
+	if (argv.p == true)
+		console.log('on -> discover: ' + peripheral);
 
 	if (locked != 0) {
 		return;
@@ -224,107 +252,32 @@ noble.on('discover', function(peripheral) {
 	}
 
 	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
-	if ( (activePeripherals[peripheral["uuid"]] == undefined) || doesPeripheralNeedChecking(peripheral["uuid"]) ) {
+	if ((activePeripherals[peripheral["uuid"]] == undefined) || doesPeripheralNeedChecking(peripheral["uuid"])) {
 
 		peripheral.once('connect', function() {
 			printBLEMessage('on -> connect');
-			this.updateRssi();
+			this.discoverServices();
 		});
 
 		peripheral.once('disconnect', function() {
+			// Reset the channels
+			readChannel = null;
+			writeChannel = null;
 
-			for (var serviceID in peripheral["services"]) {
-				var service = peripheral["services"][serviceID]
-				if (service["uuid"] == userServiceUUID) {
-					for (var characteristicID in service["characteristics"]) {
-						characteristic = service["characteristics"][characteristicID];
-						if (characteristic["uuid"] === userCharacteristicUUID) {
-							//console.log("Deleting " + characteristic["_peripheralUuid"]);
-							//delete activePeripherals[characteristic["_peripheralUuid"]];
-						}
-					}
-				}
-			}
-			printBLEMessage('on -> disconnect');
-
-			printBLEMessage("Start scanning again")
+			printBLEMessage("Disconnected....Starting to scan again")
 			startScanning();
 		});
 
 		peripheral.once('rssiUpdate', function(rssi) {
 			printBLEMessage('on -> RSSI update ' + rssi);
-			this.discoverServices();
 		});
 
-		peripheral.once('servicesDiscover', function(services) {
-			for (var serviceID in services) {
-				service = services[serviceID];
-				if (service["uuid"] === userServiceUUID) {
-					service.on('characteristicsDiscover', function(characteristics) {
-						for (var characteristicID in characteristics) {
-							characteristic = characteristics[characteristicID];
-							if (characteristic["uuid"] === userCharacteristicUUID) {
-								characteristic.on('read', function(data, isNotification) {
-									printBLEMessage('on -> characteristic read ' + data + ' ' + isNotification);
-
-									var peripheralData = {
-										name: data.toString(),
-										lastConnectionTime: Date.now()
-									}
-
-									console.log("Found new user: " + peripheralData.name);
-
-									activePeripherals[peripheral["uuid"]] = peripheralData;
-									removePeripheralFromChecking(peripheral["uuid"]);
-									console.log(activePeripherals)
-								});
-
-								characteristic.read();
-
-							} else if (characteristic["uuid"] === nonceUUID) {
-								characteristic.on('write', function() {
-									printBLEMessage('on -> characteristic write ');
-								});
-								var nonceString = makeNonce();
-								var nonceValue = new Buffer(nonceString, "utf-8");
-
-								console.log("Sending Nonce " + nonceString);
-
-								characteristic.write(nonceValue, function(err) {
-									if (err) {
-										printBLEMessage("Error writing value " + err);
-									}
-								});
-							} else if (characteristic["uuid"] === keyUUID) {
-								characteristic.notify(true, function(err) {
-									if (err) {
-										printBLEMessage("Error subscribing to notification " + err);
-									}
-								});
-
-								characteristic.on('notify', function(state) {
-									printBLEMessage('on -> characteristic notify ' + state);
-									userKey = "";
-								});
-
-								characteristic.on('read', function(data, isNotification) {
-									if (data.toString('hex') == "04") {
-										console.log("Final user key: " + userKey);
-										locked = 0;
-										peripheral.disconnect();
-									} else {
-										userKey += data;
-									}
-								});
-							}
-						}
-					});
-					service.discoverCharacteristics();
-				}
-			}
-		});
+		peripheral.once('servicesDiscover', onServiceDiscoveredCallback);
 
 		stopScanning();
+
+		console.log("Found user with UUID: " + getUserUUID(peripheral));
+
 		peripheral.connect(function(err) {
 			if (err) {
 				console.log(err);
@@ -334,7 +287,10 @@ noble.on('discover', function(peripheral) {
 		locked = 0;
 		startScanning();
 	}
-});
+
+};
+
+noble.on('discover', onDeviceDiscoveredCallback);
 
 // http://stackoverflow.com/questions/1349404/generate-a-string-of-5-random-characters-in-javascript
 function makeNonce()
@@ -342,8 +298,74 @@ function makeNonce()
     var text = "";
     var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-    for( var i=0; i < 5; i++ )
+    for(var i = 0; i < 5; i++ )
         text += possible.charAt(Math.floor(Math.random() * possible.length));
 
     return text;
 }
+
+function getUserUUID(peripheral)
+{
+	return peripheral.advertisement.manufacturerData.slice(2).toString();
+}
+
+function sendMessage(message) {
+	if (writeChannel != null) {
+		// Send the first packet
+		var currentSubMessage = "1";
+		currentSubMessage += message.substr(0, 19);
+		rawWrite(currentSubMessage);
+
+		// Get the message length
+		var messagesToSend = Math.ceil(message.length / 19.0);
+
+		for (var i = 1; i < messagesToSend; i++) {
+			// Create the data packet
+			currentSubMessage = "2";
+			currentSubMessage += message.substr(i * 19, 19);
+			rawWrite(currentSubMessage);
+		}
+
+		// Send EOM
+		currentSubMessage = "3";
+		rawWrite(currentSubMessage);
+	}
+}
+
+function rawWrite(message) {
+	if (writeChannel != null) {
+		var bufferString = new Buffer(message, "utf-8");
+		writeChannel.write(bufferString);
+		console.log("Sending message: " + message);
+	}
+}
+
+function readMessage(message) {
+	console.log(message);
+	if (message == "9AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F05") {
+		console.log("SUCCESS!");
+	}
+}
+
+var onReadMessage = function rawReadMessage(data, isNotification) {
+
+	var dataString = data.toString();
+
+	if(dataString[0] == '1') {
+		readString = "";
+		for (var i = 1; i < dataString.length; i++) {
+			readString += dataString[i];
+		}
+	}
+
+	if(dataString[0] == '2') {
+		for (var i = 1; i < dataString.length; i++) {
+			readString += dataString[i];
+		}
+	}
+
+	if(dataString[0] == '3') {
+		if (readString != "") readMessage(readString);
+	}
+
+};
