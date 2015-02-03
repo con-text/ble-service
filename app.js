@@ -24,57 +24,122 @@ if (!Date.now) {
     Date.now = function() { return new Date().getTime(); }
 }
 
+function getMockData() {
+
+	// Some mock users
+	var users = [
+			{id: '0001' },
+			{id: '0002' },
+			{id: '0003' },
+			{id: '0004' }
+	];
+
+	return users;
+}
+
+
+// From http://stackoverflow.com/questions/11935175/sampling-a-random-subset-from-an-array
+function getRandomSubarray(arr, size) {
+		var shuffled = arr.slice(0), i = arr.length, temp, index;
+		while (i--) {
+				index = Math.floor((i + 1) * Math.random());
+				temp = shuffled[index];
+				shuffled[index] = shuffled[i];
+				shuffled[i] = temp;
+		}
+		return shuffled.slice(0, size);
+}
+
+function getRandomInt(min, max) {
+		return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 // Set up socket
-var server = net.createServer({allowHalfOpen: true}, function(socket) { 
+var server = net.createServer({allowHalfOpen: true}, function(socket) {
+
+	var useMockData = false;
+
+	if(process.argv.length > 2 && process.argv[2] === "--mock") {
+			useMockData = true;
+	}
+
+	var updateInterval = 5000;
+
+	if(useMockData) {
+		updateInterval: 15000;
+	}
 
 	// Check active devices are still around
 	setInterval(function(){
-	
+
 		console.log("Current active users: " + JSON.stringify(activePeripherals))
 		console.log("Current stale users: " + JSON.stringify(needsCheckingQueue))
 
-		if(socket.writable) {
-			socket.write(JSON.stringify(activePeripheralsToUserData()))
+
+
+		if(useMockData) {
+
+			// Take random array elements
+			var allMockUsers = getMockData();
+
+			var users = getRandomSubarray(allMockUsers, getRandomInt(0,
+				allMockUsers.length));
+
+			var data = {
+				clients: users
+			};
+
+			if(socket.writable) {
+				socket.write(JSON.stringify(data))
+			} else {
+				socket.end();
+			}
+
 		} else {
-			socket.end();
-		}
-	
-		for (var peripheralKey in activePeripherals) {
-	
-			if ( (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 15000)) && activePeripherals[peripheralKey]["lastConnectionTime"] > (Date.now() - 60000) ) {
-	
-				// Is it already in the queue?
-				for (var i = 0; i < needsCheckingQueue.length; i++) {
-					if (needsCheckingQueue[i][0] == peripheralKey) return;
+
+			if(socket.writable) {
+				socket.write(JSON.stringify(activePeripheralsToUserData()))
+			} else {
+				socket.end();
+			}
+
+			for (var peripheralKey in activePeripherals) {
+
+				if ( (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 15000)) && activePeripherals[peripheralKey]["lastConnectionTime"] > (Date.now() - 60000) ) {
+
+					// Is it already in the queue?
+					for (var i = 0; i < needsCheckingQueue.length; i++) {
+						if (needsCheckingQueue[i][0] == peripheralKey) return;
+					}
+
+					needsCheckingQueue.push([peripheralKey, activePeripherals[peripheralKey]])
 				}
-	
-				needsCheckingQueue.push([peripheralKey, activePeripherals[peripheralKey]])
+
+				else if (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 60000)) {
+					console.log("Deleting " + peripheralKey + " at " + Date.now());
+					delete activePeripherals[peripheralKey];
+					removePeripheralFromChecking(peripheralKey);
+				}
+
 			}
-	
-			else if (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 60000)) {
-				console.log("Deleting " + peripheralKey + " at " + Date.now());
-				delete activePeripherals[peripheralKey];
-				removePeripheralFromChecking(peripheralKey);
-			}
-	
 		}
-	
-	},5000);
+
+	}, updateInterval);
 
 	socket.on('end', function() {
 		console.log('client disconnected');
 	});
- 
+
 	socket.on('error', function(err) {
 		console.log("Error occured", err);
 	});
-	
+
 	socket.pipe(socket);
 
 });
 
 var port = 5001;
- 
+
 server.listen(port, function () {
 	console.log("Listening on " + port)
 });
@@ -133,9 +198,9 @@ function printBLEMessage(message)
 noble.on('stateChange', function(state) {
 	printBLEMessage('on -> stateChange: ' + state);
 
-	if (state === 'poweredOn') 
+	if (state === 'poweredOn')
 		startScanning();
-	else 
+	else
 		stopScanning();
 
 });
@@ -158,9 +223,9 @@ noble.on('discover', function(peripheral) {
 		locked = 1;
 	}
 
-	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue 
+	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
 	if ( (activePeripherals[peripheral["uuid"]] == undefined) || doesPeripheralNeedChecking(peripheral["uuid"]) ) {
-	
+
 		peripheral.once('connect', function() {
 			printBLEMessage('on -> connect');
 			this.updateRssi();
@@ -198,7 +263,7 @@ noble.on('discover', function(peripheral) {
 					service.on('characteristicsDiscover', function(characteristics) {
 						for (var characteristicID in characteristics) {
 							characteristic = characteristics[characteristicID];
-							if (characteristic["uuid"] === userCharacteristicUUID) {							
+							if (characteristic["uuid"] === userCharacteristicUUID) {
 								characteristic.on('read', function(data, isNotification) {
 									printBLEMessage('on -> characteristic read ' + data + ' ' + isNotification);
 
@@ -250,7 +315,7 @@ noble.on('discover', function(peripheral) {
 									} else {
 										userKey += data;
 									}
-								});					
+								});
 							}
 						}
 					});
