@@ -96,7 +96,7 @@ var handshake = new machina.Fsm( {
 		},
 		encryptBlockViaOracle: {
 
-			// Send uuid + random block to Oracle
+			// Send uuid + wearable's random block to Oracle
 			// Recieve back an encrypted block
 
 			_onEnter: function() {
@@ -116,7 +116,7 @@ var handshake = new machina.Fsm( {
 		sendBlocksToWearable: {
 
 			// Generate our own random block
-			// Send new block alongside Oracle-encrypted block to wearable
+			// Send our block alongside Oracle-encrypted block to wearable
 
 			_onEnter: function() {
 				console.log("---In sendBlocksToWearable State");
@@ -126,13 +126,13 @@ var handshake = new machina.Fsm( {
 				console.log("---Sending two messages to the device:");
 				console.log(this.ourBlock.toString('hex'));
 				console.log(this.encryptedBlockFromOracle);
-				//sendMessage(randomBlock)
+				//sendMessage(this.ourBlock.toString('hex'))
 				//sendMessage(this.encryptedBlockFromOracle)
 			},
 
 			receiveDataFromWearable: function(encryptedBlock) {
 
-				// Receive the wearable's encrypted version of our random block
+				// Receive the wearable's encrypted version of our block
 				// Need to decrypt it for comparison
 				// Might contain an error if we weren't authenticated by them succesfully
 
@@ -144,8 +144,8 @@ var handshake = new machina.Fsm( {
 		},	
 		decryptBlockViaOracle: {
 
-			// Send uuid + encrypted block to Oracle for decryption
-			// With the result, check it matches the plain block we sent to the wearable
+			// Send uuid + encrypted block from wearable to Oracle for decryption
+			// With the result, check it matches our block
 
 			_onEnter: function() {
 				console.log("---In decryptBlockViaOracle State");
@@ -157,7 +157,7 @@ var handshake = new machina.Fsm( {
 				console.log("---Received encrypted block from oracle.");
 				console.log(decryptedBlock);
 
-				if (decryptedBlock == this.ourBlock) {
+				if (decryptedBlock == this.ourBlock.toString('hex')) {
 					this.transition( "successfulHandshake" );
 				} else {
 					this.transition( "unsuccessfulHandshake" );
