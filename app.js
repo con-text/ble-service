@@ -32,17 +32,21 @@ if (!Date.now) {
 	Date.now = function() { return new Date().getTime(); }
 }
 
+// Debug messages
+function printBLEMessage(message)
+{
+	if (argv.v == true) console.log(message);
+}
 
-/*
-Handshaking state machine
-Authenticates the wearable and vice versa
-*/
+
+/**************************************************
+ * Handshaking state machine
+ * Authenticates the wearable and vice versa
+ **************************************************/
 
 var handshake = new machina.Fsm( {
  
-	initialize: function( options ) {
-	   
-	},
+	initialize: function( options ) {},
  
 	namespace: "handshake",
 	initialState: "uninitialized",
@@ -121,13 +125,13 @@ var handshake = new machina.Fsm( {
 			_onEnter: function() {
 				console.log("---In sendBlocksToWearable State");
 
-				// generate random passphrase binary data
+				// Generate 256-bit random passphrase binary data
 				this.ourBlock = crypto.randomBytes(32);
 				console.log("---Sending two messages to the device:");
 				console.log(this.ourBlock.toString('hex'));
 				console.log(this.encryptedBlockFromOracle);
-				//sendMessage(this.ourBlock.toString('hex'))
-				//sendMessage(this.encryptedBlockFromOracle)
+				//writeMessage(this.ourBlock.toString('hex'))
+				//writeMessage(this.encryptedBlockFromOracle)
 			},
 
 			receiveDataFromWearable: function(encryptedBlock) {
@@ -215,6 +219,10 @@ var handshake = new machina.Fsm( {
 } );
 
 
+/**************************************************
+ * Encryption and Decryption via Oracle
+ **************************************************/
+
 // Encrypt a block using the Oracle
 function encryptBlock(uuid, plaintext) {
 	request('http://contexte.herokuapp.com/auth/stage1/' + uuid + '/' + plaintext, function (error, response, body) {
@@ -233,6 +241,10 @@ function decryptBlock(uuid, ciphertext) {
 	});
 }
 
+
+/**************************************************
+ * Data simulation for front-end active users
+ **************************************************/
 
 // Simulate data for the front-end
 function getMockData() {
@@ -264,26 +276,30 @@ function getRandomInt(min, max) {
 		return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// Set up socket to front-end
+
+
+/**************************************************
+ * Front-end socket initialisation
+ * Timeout functions to check states of queues
+ **************************************************/
+
 var server = net.createServer({allowHalfOpen: true}, function(socket) {
 
 	var useMockData = false;
 
 	if(process.argv.length > 2 && process.argv[2] === "--mock") {
-			useMockData = true;
+		useMockData = true;
 	}
 
 	var updateInterval = 5000;
 
-	if(useMockData) {
-		updateInterval: 15000;
-	}
+	if(useMockData) updateInterval: 15000;
 
-	// Check active devices are still around
+	// Check the state of active devices, and reauthenticate if necessary
 	setInterval(function(){
 
-		console.log("Current active users: " + JSON.stringify(activePeripherals))
-		console.log("Current stale users: " + JSON.stringify(needsCheckingQueue))
+		printBLEMessage("Current active users: " + JSON.stringify(activePeripherals))
+		printBLEMessage("Current stale users: " + JSON.stringify(needsCheckingQueue))
 
 		if(useMockData) {
 
@@ -297,33 +313,33 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 				clients: users
 			};
 
-			if(socket.writable) {
-				socket.write(JSON.stringify(data))
-			} else {
-				socket.end();
-			}
+			if(socket.writable) socket.write(JSON.stringify(data))
+			else socket.end();
 
 		} else {
 
-			if(socket.writable) {
-				socket.write(JSON.stringify(activePeripheralsToUserData()))
-			} else {
-				socket.end();
-			}
+			if(socket.writable) socket.write(JSON.stringify(activePeripheralsToUserData()))
+			else socket.end();
 
+			// Check each of the active peripherals
 			for (var peripheralKey in activePeripherals) {
 
+				// If we last saw the peripheral over 15s ago, but less than a minute
 				if ((activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 15000))
 					&& activePeripherals[peripheralKey]["lastConnectionTime"] > (Date.now() - 60000)) {
 
-					// Is it already in the queue?
+					// Is it already in the needsChecking queue?
 					for (var i = 0; i < needsCheckingQueue.length; i++) {
 						if (needsCheckingQueue[i][0] == peripheralKey) return;
 					}
 
+					// It wasn't in the needsChecking queue so add it in
 					needsCheckingQueue.push([peripheralKey, activePeripherals[peripheralKey]])
+
 				} else if (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 60000)) {
-					console.log("Deleting " + peripheralKey + " at " + Date.now());
+					printBLEMessage("Deleting " + peripheralKey + " at " + Date.now());
+
+					// It's been over a minute since we connected to the peripheral, delete it from active
 					delete activePeripherals[peripheralKey];
 					removePeripheralFromChecking(peripheralKey);
 				}
@@ -332,7 +348,7 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 	}, updateInterval);
 
 	socket.on('end', function() {
-		console.log('client disconnected');
+		console.log('Client disconnected');
 	});
 
 	socket.on('error', function(err) {
@@ -343,11 +359,37 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 
 });
 
+
+// Listen to the front-end socket
+
 var port = 5001;
 
 server.listen(port, function () {
 	console.log("Listening on " + port)
 });
+
+
+/**************************************************
+ * Bluetooth functions and event callbacks
+ **************************************************/
+
+function startScanning() {
+	if (isScanning == false) {
+		var serviceUUIDs = [userServiceUUID]; // default: [] => all
+		var allowDuplicates = true;
+
+		noble.startScanning(serviceUUIDs, allowDuplicates);
+
+		isScanning = true;
+	}
+}
+
+function stopScanning() {
+	if (isScanning == true) {
+		noble.stopScanning();
+		isScanning = false;
+	}
+}
 
 function activePeripheralsToUserData() {
 	data = {};
@@ -374,40 +416,11 @@ function removePeripheralFromChecking(uuid) {
 	}
 }
 
-function startScanning() {
-	if (isScanning == false) {
-		var serviceUUIDs = [userServiceUUID]; // default: [] => all
-		var allowDuplicates = true; // default: false
-
-		noble.startScanning(serviceUUIDs, allowDuplicates); // particular UUID's
-
-		isScanning = true;
-	}
-}
-
-function stopScanning() {
-	if (isScanning == true) {
-		noble.stopScanning();
-
-		isScanning = false;
-	}
-}
-
-function printBLEMessage(message)
-{
-	if (argv.v == true) {
-		console.log(message);
-	}
-}
-
 noble.on('stateChange', function(state) {
 	printBLEMessage('on -> stateChange: ' + state);
 
-	if (state === 'poweredOn')
-		startScanning();
-	else
-		stopScanning();
-
+	if (state === 'poweredOn') startScanning();
+	else stopScanning();
 });
 
 noble.on('scanStart', function() {
@@ -428,7 +441,7 @@ var onCharacteristicsDiscoveredCallback = function(characteristics) {
 		} else if (characteristic["uuid"] === writeCharacteristicUUID) {
 			writeChannel = characteristic;
 			//writeChannel.write(new Buffer("LOL", "utf-8"));
-			//sendMessage("9AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F05");
+			//writeMessage("9AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F05");
 		}
 	}
 };
@@ -446,14 +459,11 @@ var onServiceDiscoveredCallback = function(services) {
 };
 
 var onDeviceDiscoveredCallback = function(peripheral) {
-	if (argv.p == true)
-		console.log('on -> discover: ' + peripheral);
 
-	if (locked != 0) {
-		return;
-	} else {
-		locked = 1;
-	}
+	printBLEMessage('on -> discover: ' + peripheral);
+
+	if (locked != 0) return;
+	else locked = 1;
 
 	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
 	if ((activePeripherals[peripheral["uuid"]] == undefined) || doesPeripheralNeedChecking(peripheral["uuid"])) {
@@ -484,11 +494,8 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 		console.log("Found user with UUID: " + getUserUUID(peripheral));
 
 		peripheral.connect(function(err) {
-			if (err) {
-				console.log(err);
-			} else {
-				handshake.connectedToWearable(getUserUUID(peripheral));
-			}
+			if (err) console.log(err);
+			else handshake.connectedToWearable(getUserUUID(peripheral));
 		});
 	} else {
 		locked = 0;
@@ -499,63 +506,50 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 
 noble.on('discover', onDeviceDiscoveredCallback);
 
-// http://stackoverflow.com/questions/1349404/generate-a-string-of-5-random-characters-in-javascript
-function makeNonce()
-{
-	var text = "";
-	var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-	for(var i = 0; i < 5; i++ )
-		text += possible.charAt(Math.floor(Math.random() * possible.length));
-
-	return text;
-}
-
 function getUserUUID(peripheral)
 {
 	return peripheral.advertisement.manufacturerData.slice(2).toString();
 }
 
-function sendMessage(message) {
+// Write a message to the peripheral
+// Divided into several chunks and batch sent
+function writeMessage(message) {
 	if (writeChannel != null) {
+
 		// Send the first packet
 		var currentSubMessage = "1";
 		currentSubMessage += message.substr(0, 19);
-		rawWrite(currentSubMessage);
+		rawWriteMessage(currentSubMessage);
 
 		// Get the message length
 		var messagesToSend = Math.ceil(message.length / 19.0);
 
 		for (var i = 1; i < messagesToSend; i++) {
-			// Create the data packet
+			// Create the next data packet
 			currentSubMessage = "2";
 			currentSubMessage += message.substr(i * 19, 19);
-			rawWrite(currentSubMessage);
+			rawWriteMessage(currentSubMessage);
 		}
 
 		// Send EOM
 		currentSubMessage = "3";
-		rawWrite(currentSubMessage);
+		rawWriteMessage(currentSubMessage);
 	}
 }
 
-function rawWrite(message) {
+function rawWriteMessage(message) {
 	if (writeChannel != null) {
 		var bufferString = new Buffer(message, "utf-8");
 		writeChannel.write(bufferString);
-		console.log("Sending message: " + message);
+		printBLEMessage("Sending message: " + message);
 	}
-}
-
-function readMessage(message) {
-	//console.log(message);
-	handshake.receiveDataFromWearable(message);
 }
 
 var onReadMessage = function rawReadMessage(data, isNotification) {
 
 	var dataString = data.toString();
 
+	// Read the first packet
 	if(dataString[0] == '1') {
 		readString = "";
 		for (var i = 1; i < dataString.length; i++) {
@@ -563,14 +557,20 @@ var onReadMessage = function rawReadMessage(data, isNotification) {
 		}
 	}
 
+	// Read the next data packet
 	if(dataString[0] == '2') {
 		for (var i = 1; i < dataString.length; i++) {
 			readString += dataString[i];
 		}
 	}
 
+	// Read EOM
 	if(dataString[0] == '3') {
 		if (readString != "") readMessage(readString);
 	}
 
 };
+
+function readMessage(message) {
+	handshake.receiveDataFromWearable(message);
+}
