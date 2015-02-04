@@ -24,6 +24,7 @@ var isScanning = false;
 var locked = 0;
 var readChannel = null;
 var writeChannel = null;
+var disconnectChannel = null;
 
 var readString = "";
 
@@ -50,6 +51,7 @@ var handshake = new machina.Fsm( {
  
 	namespace: "handshake",
 	initialState: "uninitialized",
+	peripheral: "",
 	wearableID: "",
 	wearableData: "",
 	ourBlock: "",
@@ -70,10 +72,11 @@ var handshake = new machina.Fsm( {
 			_onEnter: function() {
 				console.log("---In discovery state");
 			},
-			connectedToWearable: function(uuid) {
+			connectedToWearable: function(peripheral, uuid) {
 
 				// Receive a plaintext block from the wearable
 				console.log("---Changing to connected state with " + uuid);
+				this.peripheral = peripheral;
 				this.wearableID = uuid;
 				this.transition( "connected" );
 			}
@@ -113,25 +116,46 @@ var handshake = new machina.Fsm( {
 				console.log("---Received encrypted block from oracle:");
 				console.log(block);
 				this.encryptedBlockFromOracle = block;
-				this.transition( "sendBlocksToWearable" );
+				this.transition( "sendCiphertextToWearable" );
 
 			}
 		},
-		sendBlocksToWearable: {
+		sendCiphertextToWearable: {
 
-			// Generate our own random block
-			// Send our block alongside Oracle-encrypted block to wearable
+			// Send Oracle-encrypted block to wearable for approval
 
 			_onEnter: function() {
-				console.log("---In sendBlocksToWearable State");
+				console.log("---In sendCiphertextToWearable State");
 
-				// Generate 256-bit random passphrase binary data
-				this.ourBlock = crypto.randomBytes(32);
-				console.log("---Sending two messages to the device:");
-				console.log(this.ourBlock.toString('hex'));
+				console.log("---Sending ciphertext to the wearable:");
 				console.log(this.encryptedBlockFromOracle);
-				//writeMessage(this.ourBlock.toString('hex'))
-				//writeMessage(this.encryptedBlockFromOracle)
+				writeMessage(this.encryptedBlockFromOracle)				
+			},
+
+			receiveDataFromWearable: function(status) {
+
+				// Receive the wearable's status
+				// i.e. whether our encryption was accepted
+
+				console.log("---Received status from wearable.");
+				console.log(status);
+				if (status == "OK") this.transition( "sendRandomBlockToWearable" );
+				else this.transition( "unsuccessfulHandshake" );
+			}
+		},
+		sendRandomBlockToWearable: {
+
+			// Generate our own random block
+			// Send our block to wearable
+
+			_onEnter: function() {
+				console.log("---In sendRandomBlockToWearable State");
+
+				// Generate 128-bit random binary data
+				console.log("---Sending random block to the wearable:");
+				this.ourBlock = crypto.randomBytes(16).toString('hex').toUpperCase();
+				console.log(this.ourBlock.toString('hex'));				
+				writeMessage(this.ourBlock.toString('hex'))
 			},
 
 			receiveDataFromWearable: function(encryptedBlock) {
@@ -145,7 +169,7 @@ var handshake = new machina.Fsm( {
 				this.encryptedBlockFromWearable = encryptedBlock;
 				this.transition( "decryptBlockViaOracle" );
 			}
-		},	
+		},			
 		decryptBlockViaOracle: {
 
 			// Send uuid + encrypted block from wearable to Oracle for decryption
@@ -158,7 +182,7 @@ var handshake = new machina.Fsm( {
 			receiveDecryptedBlockFromOracle: function(decryptedBlock) {
 
 				// Receive a decrypted block back from Oracle
-				console.log("---Received encrypted block from oracle.");
+				console.log("---Received decrypted block from oracle.");
 				console.log(decryptedBlock);
 
 				if (decryptedBlock == this.ourBlock.toString('hex')) {
@@ -175,7 +199,16 @@ var handshake = new machina.Fsm( {
 
 			_onEnter: function() {
 				console.log("---In successfulHandshake State");
+				var peripheralData = {
+					name: this.wearableID,
+					lastConnectionTime: Date.now()
+				}
+				
+				activePeripherals[this.wearableID] = peripheralData;
+				removePeripheralFromChecking(this.wearableID);
+				disconnectFromDevice(this.peripheral);
 			},
+
 			_onExit: function() {
 			}
 		},
@@ -185,6 +218,9 @@ var handshake = new machina.Fsm( {
 
 			_onEnter: function() {
 				console.log("---In unsuccessfulHandshake State");
+
+				// Trigger a disconnection from the device
+				disconnectFromDevice(this.peripheral);
 			},
 			_onExit: function() {
 			}
@@ -200,8 +236,8 @@ var handshake = new machina.Fsm( {
 		this.handle( "_reset" );
 	},
 
-	connectedToWearable: function(uuid) {
-		this.handle( "connectedToWearable", uuid );
+	connectedToWearable: function(peripheral, uuid) {
+		this.handle( "connectedToWearable", peripheral, uuid );
 	},
 
 	receiveDataFromWearable: function(block) {
@@ -234,7 +270,7 @@ function encryptBlock(uuid, plaintext) {
 
 // Decrypt a block using the Oracle
 function decryptBlock(uuid, ciphertext) {
-	request('http://contexte.herokuapp.com/auth/stage2/' + uuid + '/' + plaintext, function (error, response, body) {
+	request('http://contexte.herokuapp.com/auth/stage2/' + uuid + '/' + ciphertext, function (error, response, body) {
 		if (!error && response.statusCode == 200) {
 			handshake.receiveDecryptedBlockFromOracle(body);
 		}
@@ -442,6 +478,8 @@ var onCharacteristicsDiscoveredCallback = function(characteristics) {
 			writeChannel = characteristic;
 			//writeChannel.write(new Buffer("LOL", "utf-8"));
 			//writeMessage("9AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F059AD6368489A9A856D0E454641521DA3F56F5F9E9CAEF7AF60E84ABD1F1901F05");
+		} else if (characteristic["uuid"] === disconnectCharacteristicUUID) {
+			disconnectChannel = characteristic;
 		}
 	}
 };
@@ -477,6 +515,7 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 			// Reset the channels
 			readChannel = null;
 			writeChannel = null;
+			disconnectChannel = null;
 
 			printBLEMessage("Disconnected....Starting to scan again")
 			handshake.reset();
@@ -495,7 +534,7 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 
 		peripheral.connect(function(err) {
 			if (err) console.log(err);
-			else handshake.connectedToWearable(getUserUUID(peripheral));
+			else handshake.connectedToWearable(peripheral, getUserUUID(peripheral));
 		});
 	} else {
 		locked = 0;
@@ -514,6 +553,9 @@ function getUserUUID(peripheral)
 // Write a message to the peripheral
 // Divided into several chunks and batch sent
 function writeMessage(message) {
+
+	message = message.toUpperCase();
+
 	if (writeChannel != null) {
 
 		// Send the first packet
@@ -542,6 +584,15 @@ function rawWriteMessage(message) {
 		var bufferString = new Buffer(message, "utf-8");
 		writeChannel.write(bufferString);
 		printBLEMessage("Sending message: " + message);
+	}
+}
+
+function disconnectFromDevice(peripheral) {
+	if (disconnectChannel != null) {
+		console.log("Sending Disconnect");
+		disconnectChannel.write(new Buffer("", "utf-8"));
+		peripheral.disconnect();
+		console.log("After disconnect")
 	}
 }
 
