@@ -330,7 +330,7 @@ var handshake = new machina.Fsm( {
 function encryptBlock(uuid, plaintext) {
 	request('http://contexte.herokuapp.com/auth/stage1/' + uuid + '/' + plaintext, function (error, response, body) {
 		if (!error && response.statusCode == 200) {
-			handshake.receiveEncryptedBlockFromOracle(body);
+			handshake.receiveEncryptedBlockFromOracle(JSON.parse(body)["message"]);
 		}
 	});
 }
@@ -339,7 +339,7 @@ function encryptBlock(uuid, plaintext) {
 function decryptBlock(uuid, ciphertext) {
 	request('http://contexte.herokuapp.com/auth/stage2/' + uuid + '/' + ciphertext, function (error, response, body) {
 		if (!error && response.statusCode == 200) {
-			handshake.receiveDecryptedBlockFromOracle(body);
+			handshake.receiveDecryptedBlockFromOracle(JSON.parse(body)["message"]);
 		}
 	});
 }
@@ -568,7 +568,7 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 
 	printBLEMessage('on -> discover: ' + peripheral);
 
-	console.log("Locked value: " + locked);
+	printBLEMessage("Locked value: " + locked);
 
 	if (locked != 0) return;
 	else locked = 1;
