@@ -224,7 +224,7 @@ var handshake = new machina.Fsm( {
 				
 				activePeripherals[this.wearableID] = peripheralData;
 				removePeripheralFromChecking(this.wearableID);
-				disconnectFromDevice(this.peripheral);
+				//disconnectFromDevice(this.peripheral);
 			},
 			_reset: "discovery",
 			_onExit: function() {
