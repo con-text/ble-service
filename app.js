@@ -99,9 +99,13 @@ var handshake = new machina.Fsm( {
 
 			_onEnter: function() {
 				console.log("---In connected state with " + this.wearableID);
+				this.timer = setTimeout( function() {
+                    this.handle( "timeout" );
+                }.bind( this ), 5000 );
 			},
 
 			_reset: "discovery",
+			timeout: "unsuccessfulHandshake",
 
 			receiveDataFromWearable: function(block) {
 
@@ -111,7 +115,11 @@ var handshake = new machina.Fsm( {
 				this.wearableData = block;
 				this.transition( "encryptBlockViaOracle" );
 
-			}
+			},
+
+			_onExit: function() {
+				clearTimeout( this.timer );
+			}			
 		},
 		encryptBlockViaOracle: {
 
@@ -121,8 +129,14 @@ var handshake = new machina.Fsm( {
 			_onEnter: function() {
 				console.log("---In encryptBlockViaOracle State");
 				encryptBlock(this.wearableID, this.wearableData);
+				this.timer = setTimeout( function() {
+                    this.handle( "timeout" );
+                }.bind( this ), 5000 );
 			},
+
 			_reset: "discovery",
+			timeout: "unsuccessfulHandshake",
+
 			receiveEncryptedBlockFromOracle: function(block) {
 
 				// Receive an encrypted block back from Oracle
@@ -131,7 +145,11 @@ var handshake = new machina.Fsm( {
 				this.encryptedBlockFromOracle = block;
 				this.transition( "sendCiphertextToWearable" );
 
-			}
+			},
+
+			_onExit: function() {
+				clearTimeout( this.timer );
+			}	
 		},
 		sendCiphertextToWearable: {
 
@@ -142,10 +160,15 @@ var handshake = new machina.Fsm( {
 
 				console.log("---Sending ciphertext to the wearable:");
 				console.log(this.encryptedBlockFromOracle);
-				writeMessage(this.encryptedBlockFromOracle)				
+				writeMessage(this.encryptedBlockFromOracle)	
+
+				this.timer = setTimeout( function() {
+                    this.handle( "timeout" );
+                }.bind( this ), 5000 );
 			},
 
 			_reset: "discovery",
+			timeout: "unsuccessfulHandshake",
 
 			receiveDataFromWearable: function(status) {
 
@@ -156,6 +179,10 @@ var handshake = new machina.Fsm( {
 				console.log(status);
 				if (status == "OK") this.transition( "sendRandomBlockToWearable" );
 				else this.transition( "unsuccessfulHandshake" );
+			},
+
+			_onExit: function() {
+				clearTimeout( this.timer );
 			}
 		},
 		sendRandomBlockToWearable: {
@@ -170,10 +197,15 @@ var handshake = new machina.Fsm( {
 				console.log("---Sending random block to the wearable:");
 				this.ourBlock = crypto.randomBytes(16).toString('hex').toUpperCase();
 				console.log(this.ourBlock.toString('hex'));				
-				writeMessage(this.ourBlock.toString('hex'))
+				writeMessage(this.ourBlock.toString('hex'));
+
+				this.timer = setTimeout( function() {
+                    this.handle( "timeout" );
+                }.bind( this ), 5000 );		
 			},
 
 			_reset: "discovery",
+			timeout: "unsuccessfulHandshake",
 
 			receiveDataFromWearable: function(encryptedBlock) {
 
@@ -185,8 +217,12 @@ var handshake = new machina.Fsm( {
 				console.log(encryptedBlock);
 				this.encryptedBlockFromWearable = encryptedBlock;
 				this.transition( "decryptBlockViaOracle" );
+			},
+
+			_onExit: function() {
+				clearTimeout( this.timer );
 			}
-		},			
+		},
 		decryptBlockViaOracle: {
 
 			// Send uuid + encrypted block from wearable to Oracle for decryption
@@ -195,8 +231,15 @@ var handshake = new machina.Fsm( {
 			_onEnter: function() {
 				console.log("---In decryptBlockViaOracle State");
 				decryptBlock(this.wearableID, this.encryptedBlockFromWearable);
+
+				this.timer = setTimeout( function() {
+                    this.handle( "timeout" );
+                }.bind( this ), 5000 );	
 			},
+
 			_reset: "discovery",
+			timeout: "unsuccessfulHandshake",
+
 			receiveDecryptedBlockFromOracle: function(decryptedBlock) {
 
 				// Receive a decrypted block back from Oracle
@@ -209,6 +252,10 @@ var handshake = new machina.Fsm( {
 					this.transition( "unsuccessfulHandshake" );
 				}
 
+			},
+
+			_onExit: function() {
+				clearTimeout( this.timer );
 			}
 		},
 		successfulHandshake: {
