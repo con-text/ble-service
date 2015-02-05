@@ -28,6 +28,13 @@ var disconnectChannel = null;
 
 var readString = "";
 
+var useMockData = false;
+var updateInterval = 5000;
+
+// Change parameters for mock data
+if (process.argv.length > 2 && process.argv[2] === "--mock") useMockData = true; 
+if (useMockData) updateInterval: 15000;
+
 // Shim for IE8 Date.now
 if (!Date.now) {
 	Date.now = function() { return new Date().getTime(); }
@@ -72,6 +79,9 @@ var handshake = new machina.Fsm( {
 			_onEnter: function() {
 				console.log("---In discovery state");
 			},
+
+			_reset: "discovery",
+
 			connectedToWearable: function(peripheral, uuid) {
 
 				// Receive a plaintext block from the wearable
@@ -90,6 +100,8 @@ var handshake = new machina.Fsm( {
 			_onEnter: function() {
 				console.log("---In connected state with " + this.wearableID);
 			},
+
+			_reset: "discovery",
 
 			receiveDataFromWearable: function(block) {
 
@@ -110,6 +122,7 @@ var handshake = new machina.Fsm( {
 				console.log("---In encryptBlockViaOracle State");
 				encryptBlock(this.wearableID, this.wearableData);
 			},
+			_reset: "discovery",
 			receiveEncryptedBlockFromOracle: function(block) {
 
 				// Receive an encrypted block back from Oracle
@@ -131,6 +144,8 @@ var handshake = new machina.Fsm( {
 				console.log(this.encryptedBlockFromOracle);
 				writeMessage(this.encryptedBlockFromOracle)				
 			},
+
+			_reset: "discovery",
 
 			receiveDataFromWearable: function(status) {
 
@@ -158,6 +173,8 @@ var handshake = new machina.Fsm( {
 				writeMessage(this.ourBlock.toString('hex'))
 			},
 
+			_reset: "discovery",
+
 			receiveDataFromWearable: function(encryptedBlock) {
 
 				// Receive the wearable's encrypted version of our block
@@ -179,6 +196,7 @@ var handshake = new machina.Fsm( {
 				console.log("---In decryptBlockViaOracle State");
 				decryptBlock(this.wearableID, this.encryptedBlockFromWearable);
 			},
+			_reset: "discovery",
 			receiveDecryptedBlockFromOracle: function(decryptedBlock) {
 
 				// Receive a decrypted block back from Oracle
@@ -208,7 +226,7 @@ var handshake = new machina.Fsm( {
 				removePeripheralFromChecking(this.wearableID);
 				disconnectFromDevice(this.peripheral);
 			},
-
+			_reset: "discovery",
 			_onExit: function() {
 			}
 		},
@@ -222,12 +240,14 @@ var handshake = new machina.Fsm( {
 				// Trigger a disconnection from the device
 				disconnectFromDevice(this.peripheral);
 			},
+			_reset: "discovery",
 			_onExit: function() {
 			}
 		}
 	},
  
 	reset: function() {
+		console.log("---Resetting state machine")
 		this.wearableID = "";
 		this.wearableData = "";
 		this.ourBlock = "";
@@ -316,26 +336,13 @@ function getRandomInt(min, max) {
 
 /**************************************************
  * Front-end socket initialisation
- * Timeout functions to check states of queues
+ * Timeout functions to send active peripherals
  **************************************************/
 
 var server = net.createServer({allowHalfOpen: true}, function(socket) {
 
-	var useMockData = false;
-
-	if(process.argv.length > 2 && process.argv[2] === "--mock") {
-		useMockData = true;
-	}
-
-	var updateInterval = 5000;
-
-	if(useMockData) updateInterval: 15000;
-
 	// Check the state of active devices, and reauthenticate if necessary
 	setInterval(function(){
-
-		printBLEMessage("Current active users: " + JSON.stringify(activePeripherals))
-		printBLEMessage("Current stale users: " + JSON.stringify(needsCheckingQueue))
 
 		if(useMockData) {
 
@@ -357,29 +364,6 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 			if(socket.writable) socket.write(JSON.stringify(activePeripheralsToUserData()))
 			else socket.end();
 
-			// Check each of the active peripherals
-			for (var peripheralKey in activePeripherals) {
-
-				// If we last saw the peripheral over 15s ago, but less than a minute
-				if ((activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 15000))
-					&& activePeripherals[peripheralKey]["lastConnectionTime"] > (Date.now() - 60000)) {
-
-					// Is it already in the needsChecking queue?
-					for (var i = 0; i < needsCheckingQueue.length; i++) {
-						if (needsCheckingQueue[i][0] == peripheralKey) return;
-					}
-
-					// It wasn't in the needsChecking queue so add it in
-					needsCheckingQueue.push([peripheralKey, activePeripherals[peripheralKey]])
-
-				} else if (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 60000)) {
-					printBLEMessage("Deleting " + peripheralKey + " at " + Date.now());
-
-					// It's been over a minute since we connected to the peripheral, delete it from active
-					delete activePeripherals[peripheralKey];
-					removePeripheralFromChecking(peripheralKey);
-				}
-			}
 		}
 	}, updateInterval);
 
@@ -397,12 +381,49 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 
 
 // Listen to the front-end socket
-
 var port = 5001;
 
 server.listen(port, function () {
 	console.log("Listening on " + port)
 });
+
+
+/**************************************************
+ * Check state of queues, reauth if necessary
+ **************************************************/
+
+setInterval(function(){
+
+	printBLEMessage("Current active users: " + JSON.stringify(activePeripherals))
+	printBLEMessage("Current stale users: " + JSON.stringify(needsCheckingQueue))
+
+	if(!useMockData) {
+
+		// Check each of the active peripherals
+		for (var peripheralKey in activePeripherals) {
+
+			// If we last saw the peripheral over 15s ago, but less than a minute
+			if ((activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 15000))
+				&& activePeripherals[peripheralKey]["lastConnectionTime"] > (Date.now() - 60000)) {
+
+				// Is it already in the needsChecking queue?
+				for (var i = 0; i < needsCheckingQueue.length; i++) {
+					if (needsCheckingQueue[i][0] == peripheralKey) return;
+				}
+
+				// It wasn't in the needsChecking queue so add it in
+				needsCheckingQueue.push([peripheralKey, activePeripherals[peripheralKey]])
+
+			} else if (activePeripherals[peripheralKey]["lastConnectionTime"] < (Date.now() - 60000)) {
+				printBLEMessage("Deleting " + peripheralKey + " at " + Date.now());
+
+				// It's been over a minute since we connected to the peripheral, delete it from active
+				delete activePeripherals[peripheralKey];
+				removePeripheralFromChecking(peripheralKey);
+			}
+		}
+	}
+}, updateInterval);
 
 
 /**************************************************
@@ -500,11 +521,13 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 
 	printBLEMessage('on -> discover: ' + peripheral);
 
+	console.log("Locked value: " + locked);
+
 	if (locked != 0) return;
 	else locked = 1;
 
 	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
-	if ((activePeripherals[peripheral["uuid"]] == undefined) || doesPeripheralNeedChecking(peripheral["uuid"])) {
+	if ((activePeripherals[getUserUUID(peripheral)] == undefined) || doesPeripheralNeedChecking(getUserUUID(peripheral))) {
 
 		peripheral.once('connect', function() {
 			printBLEMessage('on -> connect');
@@ -519,6 +542,7 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 
 			printBLEMessage("Disconnected....Starting to scan again")
 			handshake.reset();
+			locked = 0;
 			startScanning();
 		});
 
@@ -592,7 +616,6 @@ function disconnectFromDevice(peripheral) {
 		console.log("Sending Disconnect");
 		disconnectChannel.write(new Buffer("", "utf-8"));
 		peripheral.disconnect();
-		console.log("After disconnect")
 	}
 }
 
