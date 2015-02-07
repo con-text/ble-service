@@ -265,7 +265,7 @@ var handshake = new machina.Fsm( {
 			_onEnter: function() {
 				console.log("---In successfulHandshake State");
 				var peripheralData = {
-					name: this.wearableID,
+					state: "active",
 					lastConnectionTime: Date.now()
 				}
 				
@@ -455,7 +455,10 @@ setInterval(function(){
 
 				// Is it already in the needsChecking queue?
 				for (var i = 0; i < needsCheckingQueue.length; i++) {
-					if (needsCheckingQueue[i][0] == peripheralKey) return;
+					if (needsCheckingQueue[i][0] == peripheralKey) {
+						activePeripherals[peripheralKey]["state"] = "stale";
+						return;
+					}
 				}
 
 				// It wasn't in the needsChecking queue so add it in
@@ -500,7 +503,7 @@ function activePeripheralsToUserData() {
 	data["clients"] = [];
 
 	for (var peripheral in activePeripherals) {
-		data["clients"].push({id: peripheral, name: activePeripherals[peripheral]["name"]})
+		data["clients"].push({id: peripheral, name: activePeripherals[peripheral]["state"]})
 	}
 
 	return data;
