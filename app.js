@@ -503,7 +503,7 @@ function activePeripheralsToUserData() {
 	data["clients"] = [];
 
 	for (var peripheral in activePeripherals) {
-		data["clients"].push({id: peripheral, name: activePeripherals[peripheral]["state"]})
+		data["clients"].push({id: peripheral, state: activePeripherals[peripheral]["state"]})
 	}
 
 	return data;
