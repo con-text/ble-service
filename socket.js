@@ -9,6 +9,7 @@ var bluetooth = require("./bluetooth.js");
 
 // Libraries
 var net = require('net');
+var fs  = require('fs');
 
 // Simulate data for the front-end
 function getMockData() {
@@ -38,6 +39,12 @@ function getRandomSubarray(arr, size) {
 
 function getRandomInt(min, max) {
 		return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function startService(socketName) {
+	server.listen(socketName, function () {
+		console.log("Created server at unix socket " + socketName);
+	});
 }
 
 var server = net.createServer({allowHalfOpen: true}, function(socket) {
@@ -85,12 +92,29 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 
 	socket.pipe(socket);
 
+	// On Ctrl-C exit
+	process.on( 'SIGINT', function() {
+
+		// Close BLE service socket
+		socket.end();
+
+		// some other closing procedures go here
+		process.exit();
+	});
+
 });
 
 
 // Listen to the front-end socket
 var socketName = "/tmp/ble.sock";
 
-server.listen(socketName, function () {
-	console.log("Created server at unix socket " + socketName);
+fs.exists(socketName, function(exists) {
+	if(exists) {
+		fs.unlink(socketName, function(err) {
+			if(err) throw err;
+			startService(socketName);
+		});
+	} else {
+		startService(socketName);
+	}
 });
