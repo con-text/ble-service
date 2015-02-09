@@ -45,6 +45,8 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 	// Check the state of active devices, and reauthenticate if necessary
 	setInterval(function(){
 
+		var data = {};
+
 		if(common.useMockData) {
 
 			// Take random array elements
@@ -53,19 +55,24 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 			var users = getRandomSubarray(allMockUsers, getRandomInt(0,
 				allMockUsers.length));
 
-			var data = {
+			data = {
 				clients: users
 			};
 
-			if(socket.writable) socket.write(JSON.stringify(data))
-			else socket.end();
 
 		} else {
 
-			if(socket.writable) socket.write(JSON.stringify(bluetooth.activePeripheralsToUserData()))
-			else socket.end();
-
+			// Get active users from bluetooth
+			data = bluetooth.activePeripheralsToUserData();
 		}
+
+		// Write data to the socket
+		if(socket.writable) {
+			socket.write(JSON.stringify(data))
+		} else {
+			socket.end();
+		}
+
 	}, common.updateInterval);
 
 	socket.on('end', function() {
@@ -82,8 +89,8 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 
 
 // Listen to the front-end socket
-var port = 5001;
+var socketName = "/tmp/ble.sock";
 
-server.listen(port, function () {
-	console.log("Listening on " + port)
+server.listen(socketName, function () {
+	console.log("Created server at unix socket " + socketName);
 });
