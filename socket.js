@@ -10,6 +10,7 @@ var bluetooth = require("./bluetooth.js");
 // Libraries
 var net = require('net');
 var fs  = require('fs');
+var JsonSocket = require('json-socket');
 
 // Simulate data for the front-end
 function getMockData() {
@@ -47,7 +48,12 @@ function startService(socketName) {
 	});
 }
 
-var server = net.createServer({allowHalfOpen: true}, function(socket) {
+var server = net.createServer({allowHalfOpen: true});
+
+server.on('connection', function(socket) {
+
+	// Decorate with Json Socket
+	socket = new JsonSocket(socket);
 
 	// Check the state of active devices, and reauthenticate if necessary
 	setInterval(function(){
@@ -72,13 +78,9 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 			// Get active users from bluetooth
 			data = bluetooth.activePeripheralsToUserData();
 		}
-
+		
 		// Write data to the socket
-		if(socket.writable) {
-			socket.write(JSON.stringify(data))
-		} else {
-			socket.end();
-		}
+		socket.sendMessage(data);
 
 	}, common.updateInterval);
 
@@ -89,8 +91,6 @@ var server = net.createServer({allowHalfOpen: true}, function(socket) {
 	socket.on('error', function(err) {
 		console.log("Error occured", err);
 	});
-
-	socket.pipe(socket);
 
 	// On Ctrl-C exit
 	process.on( 'SIGINT', function() {
