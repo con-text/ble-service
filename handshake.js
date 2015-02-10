@@ -11,6 +11,7 @@ var bluetooth = require("./bluetooth.js");
 var machina = require('machina');
 var crypto = require('crypto');
 var request = require('request');
+var colors = require('colors');
 
 var handshakeSM = new machina.Fsm( {
  
@@ -223,7 +224,7 @@ var handshakeSM = new machina.Fsm( {
 			// Authentication was successful on both ends
 
 			_onEnter: function() {
-				console.log("---In successfulHandshake State");
+				console.log("---In successfulHandshake State".bold.green);
 				var peripheralData = {
 					state: "active",
 					lastConnectionTime: Date.now()
@@ -243,7 +244,7 @@ var handshakeSM = new machina.Fsm( {
 			// Authentication failed
 
 			_onEnter: function() {
-				console.log("---In unsuccessfulHandshake State");
+				console.log("---In unsuccessfulHandshake State".bold.red);
 				console.log(JSON.stringify(bluetooth))
 				// Trigger a disconnection from the device
 				bluetooth.disconnectFromDevice(this.peripheral);
@@ -255,7 +256,7 @@ var handshakeSM = new machina.Fsm( {
 	},
  
 	reset: function() {
-		console.log("---Resetting state machine")
+		console.log("---Resetting state machine".bold.cyan)
 		this.wearableID = "";
 		this.wearableData = "";
 		this.ourBlock = "";

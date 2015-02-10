@@ -127,6 +127,8 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
 	if ((activePeripherals[getUserUUID(peripheral)] == undefined) || doesPeripheralNeedChecking(getUserUUID(peripheral))) {
 
+		stopScanning();
+
 		peripheral.once('connect', function() {
 			common.printBLEMessage('on -> connect');
 			this.discoverServices();
@@ -144,13 +146,13 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 			startScanning();
 		});
 
-		peripheral.once('rssiUpdate', function(rssi) {
-			common.printBLEMessage('on -> RSSI update ' + rssi);
-		});
+		//peripheral.once('rssiUpdate', function(rssi) {
+		//	common.printBLEMessage('on -> RSSI update ' + rssi);
+		//});
 
-		peripheral.once('servicesDiscover', onServiceDiscoveredCallback);
-
-		stopScanning();
+		if (peripheral._events.servicesDiscover === undefined) {
+			peripheral.once('servicesDiscover', onServiceDiscoveredCallback);
+		}
 
 		console.log("Found user with UUID: " + getUserUUID(peripheral));
 
@@ -219,6 +221,7 @@ var onReadMessage = function rawReadMessage(data, isNotification) {
 
 	// Read the first packet
 	if(dataString[0] == '1') {
+		console.log("Read 1 " + isNotification)
 		readString = "";
 		for (var i = 1; i < dataString.length; i++) {
 			readString += dataString[i];
@@ -227,6 +230,7 @@ var onReadMessage = function rawReadMessage(data, isNotification) {
 
 	// Read the next data packet
 	if(dataString[0] == '2') {
+		console.log("Read 2 " + isNotification)
 		for (var i = 1; i < dataString.length; i++) {
 			readString += dataString[i];
 		}
