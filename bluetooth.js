@@ -221,7 +221,6 @@ var onReadMessage = function rawReadMessage(data, isNotification) {
 
 	// Read the first packet
 	if(dataString[0] == '1') {
-		console.log("Read 1 " + isNotification)
 		readString = "";
 		for (var i = 1; i < dataString.length; i++) {
 			readString += dataString[i];
@@ -230,7 +229,6 @@ var onReadMessage = function rawReadMessage(data, isNotification) {
 
 	// Read the next data packet
 	if(dataString[0] == '2') {
-		console.log("Read 2 " + isNotification)
 		for (var i = 1; i < dataString.length; i++) {
 			readString += dataString[i];
 		}
