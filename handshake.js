@@ -60,8 +60,8 @@ var handshakeSM = new machina.Fsm( {
 				console.log("---In connected state with " + this.wearableID);
 
 				this.timer = setTimeout( function() {
-                    this.handle( "timeout" );
-                }.bind( this ), 5000 );
+					this.handle( "timeout" );
+				}.bind( this ), 5000 );
 			},
 
 			_reset: "discovery",
@@ -93,7 +93,7 @@ var handshakeSM = new machina.Fsm( {
 					this.purpose = "login";
 					console.log("---Sending login");
 					bluetooth.writeMessage("login");
-          			socket.resetLoginId();
+		  			socket.resetLoginId();
 				} else {
 					this.purpose = "heartbeat";
 					console.log("---Sending heartbeat");
@@ -101,8 +101,8 @@ var handshakeSM = new machina.Fsm( {
 				}
 
 				this.timer = setTimeout( function() {
-                    this.handle( "timeout" );
-                }.bind( this ), 5000 );
+					this.handle( "timeout" );
+				}.bind( this ), 5000 );
 			},
 
 			_reset: "discovery",
@@ -131,8 +131,8 @@ var handshakeSM = new machina.Fsm( {
 				console.log("---In encryptBlockViaOracle State");
 				encryptBlock(this.wearableID, this.wearableData);
 				this.timer = setTimeout( function() {
-                    this.handle( "timeout" );
-                }.bind( this ), 7000 );
+					this.handle( "timeout" );
+				}.bind( this ), 7000 );
 			},
 
 			_reset: "discovery",
@@ -164,8 +164,8 @@ var handshakeSM = new machina.Fsm( {
 				bluetooth.writeMessage(this.encryptedBlockFromOracle)
 
 				this.timer = setTimeout( function() {
-                    this.handle( "timeout" );
-                }.bind( this ), 5000 );
+					this.handle( "timeout" );
+				}.bind( this ), 5000 );
 			},
 
 			_reset: "discovery",
@@ -201,8 +201,8 @@ var handshakeSM = new machina.Fsm( {
 				bluetooth.writeMessage(this.ourBlock.toString('hex'));
 
 				this.timer = setTimeout( function() {
-                    this.handle( "timeout" );
-                }.bind( this ), 5000 );
+					this.handle( "timeout" );
+				}.bind( this ), 5000 );
 			},
 
 			_reset: "discovery",
@@ -234,8 +234,8 @@ var handshakeSM = new machina.Fsm( {
 				decryptBlock(this.wearableID, this.encryptedBlockFromWearable);
 
 				this.timer = setTimeout( function() {
-                    this.handle( "timeout" );
-                }.bind( this ), 7000 );
+					this.handle( "timeout" );
+				}.bind( this ), 7000 );
 			},
 
 			_reset: "discovery",
