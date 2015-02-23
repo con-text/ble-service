@@ -17,10 +17,10 @@ function getMockData() {
 
 	// Some mock users
 	var users = [
-			{id: '0001' },
-			{id: '0002' },
-			{id: '0003' },
-			{id: '0004' }
+			{id: 'EA8F2A44', state: 'active' },
+			{id: 'ABC1231', state: 'active' },
+			{id: 'tester', state: 'active' },
+			{id: 'ABC1232', state: 'stale' }
 	];
 
 	return users;
@@ -28,14 +28,16 @@ function getMockData() {
 
 // From http://stackoverflow.com/questions/11935175/sampling-a-random-subset-from-an-array
 function getRandomSubarray(arr, size) {
-		var shuffled = arr.slice(0), i = arr.length, temp, index;
+		var shuffled = arr.slice(1), i = arr.length-1, temp, index;
 		while (i--) {
 				index = Math.floor((i + 1) * Math.random());
 				temp = shuffled[index];
 				shuffled[index] = shuffled[i];
 				shuffled[i] = temp;
 		}
-		return shuffled.slice(0, size);
+		var res = [arr[0]].concat(shuffled.slice(0, size));
+		console.log(res);
+		return res;
 }
 
 function getRandomInt(min, max) {
@@ -56,7 +58,7 @@ server.on('connection', function(socket) {
 	socket = new JsonSocket(socket);
 
 	// Check the state of active devices, and reauthenticate if necessary
-	setInterval(function(){
+	var intervaHandle = setInterval(function(){
 
 		var data = {};
 
@@ -78,17 +80,19 @@ server.on('connection', function(socket) {
 			// Get active users from bluetooth
 			data = bluetooth.activePeripheralsToUserData();
 		}
-		
+
 		// Write data to the socket
 		socket.sendMessage(data);
 
 	}, common.updateInterval);
 
 	socket.on('end', function() {
+		clearInterval(intervaHandle);
 		console.log('Client disconnected');
 	});
 
 	socket.on('error', function(err) {
+		clearInterval(intervaHandle);
 		console.log("Error occured", err);
 	});
 
