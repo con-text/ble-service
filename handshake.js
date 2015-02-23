@@ -6,6 +6,7 @@
 // Modules
 var common = require("./common.js");
 var bluetooth = require("./bluetooth.js");
+var socket = require("./socket.js");
 
 // Libraries
 var machina = require('machina');
@@ -54,12 +55,48 @@ var handshakeSM = new machina.Fsm( {
 		},
 		connected: {
 
-			// In connected state, await a block from wearable to begin handshaking
-			// If we don't receive any data from the wearable after some time, we should timeout
-			// and return back to discovery mode
-
 			_onEnter: function() {
 				console.log("---In connected state with " + this.wearableID);
+
+				this.timer = setTimeout( function() {
+                    this.handle( "timeout" );
+                }.bind( this ), 5000 );
+			},
+
+			_reset: "discovery",
+			timeout: "unsuccessfulHandshake",
+
+			writeChannelFound: function() {
+
+				// Transition when write channel obtained
+				console.log("---Found write channel");
+				this.transition( "writeChannelFound" );
+
+			},
+
+			_onExit: function() {
+				clearTimeout( this.timer );
+			}			
+		},		
+		writeChannelFound: {
+
+			// In connected state, inform wearable if login or heartbeat
+			// Then await a block from wearable to begin handshaking
+			// If we don't receive any data from the wearable after some time
+			// we should timeout and return back to discovery mode
+
+			_onEnter: function() {
+				console.log("---In writeChannelFound state with " + this.wearableID);
+
+				if (socket.loginID == this.wearableID) {
+					console.log("---Sending login");
+					bluetooth.writeMessage("login");
+					socket.loginID = "";
+				} else {
+					console.log("---Sending heartbeat");
+					bluetooth.writeMessage("heartbeat");
+				}
+
 				this.timer = setTimeout( function() {
                     this.handle( "timeout" );
                 }.bind( this ), 5000 );
@@ -92,7 +129,7 @@ var handshakeSM = new machina.Fsm( {
 				encryptBlock(this.wearableID, this.wearableData);
 				this.timer = setTimeout( function() {
                     this.handle( "timeout" );
-                }.bind( this ), 5000 );
+                }.bind( this ), 7000 );
 			},
 
 			_reset: "discovery",
@@ -100,7 +137,7 @@ var handshakeSM = new machina.Fsm( {
 
 			receiveEncryptedBlockFromOracle: function(block) {
 
-				// Receive an encrypted block back from Oracle
+				// Receive an encrypted block and mac back from Oracle
 				console.log("---Received encrypted block from oracle:");
 				console.log(block);
 				this.encryptedBlockFromOracle = block;
@@ -121,7 +158,7 @@ var handshakeSM = new machina.Fsm( {
 
 				console.log("---Sending ciphertext to the wearable:");
 				console.log(this.encryptedBlockFromOracle);
-				bluetooth.writeMessage(this.encryptedBlockFromOracle)	
+				bluetooth.writeMessage(this.encryptedBlockFromOracle)
 
 				this.timer = setTimeout( function() {
                     this.handle( "timeout" );
@@ -195,7 +232,7 @@ var handshakeSM = new machina.Fsm( {
 
 				this.timer = setTimeout( function() {
                     this.handle( "timeout" );
-                }.bind( this ), 5000 );	
+                }.bind( this ), 7000 );	
 			},
 
 			_reset: "discovery",
@@ -269,6 +306,10 @@ var handshakeSM = new machina.Fsm( {
 		this.handle( "connectedToWearable", peripheral, uuid );
 	},
 
+	writeChannelFound: function() {
+		this.handle( "writeChannelFound");
+	},
+
 	receiveDataFromWearable: function(block) {
 		this.handle("receiveDataFromWearable", block );
 	},
@@ -283,7 +324,7 @@ var handshakeSM = new machina.Fsm( {
 
 } );
 
-// Encrypt a block using the Oracle
+// Encrypt a block using the Oracle, receive back Ciphertext + MAC
 function encryptBlock(uuid, plaintext) {
 	request('http://contexte.herokuapp.com/auth/stage1/' + uuid + '/' + plaintext, function (error, response, body) {
 		if (!error && response.statusCode == 200) {
@@ -292,7 +333,7 @@ function encryptBlock(uuid, plaintext) {
 	});
 }
 
-// Decrypt a block using the Oracle
+// Decrypt a block using the Oracle, receive back Plaintext
 function decryptBlock(uuid, ciphertext) {
 	request('http://contexte.herokuapp.com/auth/stage2/' + uuid + '/' + ciphertext, function (error, response, body) {
 		if (!error && response.statusCode == 200) {
