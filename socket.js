@@ -12,6 +12,9 @@ var net = require('net');
 var fs  = require('fs');
 var JsonSocket = require('json-socket');
 
+// Wearable ID to initiate login sequence with
+var loginID = "EA8F2A44";
+
 // Simulate data for the front-end
 function getMockData() {
 
@@ -118,3 +121,7 @@ fs.exists(socketName, function(exists) {
 		startService(socketName);
 	}
 });
+
+module.exports = {
+  loginID: loginID
+};

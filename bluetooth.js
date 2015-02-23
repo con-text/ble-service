@@ -99,6 +99,7 @@ var onCharacteristicsDiscoveredCallback = function(characteristics) {
 			readChannel.on('read', onReadMessage);
 		} else if (characteristic["uuid"] === writeCharacteristicUUID) {
 			writeChannel = characteristic;
+			handshake.handshakeSM.writeChannelFound();
 		} else if (characteristic["uuid"] === disconnectCharacteristicUUID) {
 			disconnectChannel = characteristic;
 		}
