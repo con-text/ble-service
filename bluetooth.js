@@ -5,6 +5,7 @@
 // Modules
 var common = require("./common.js");
 var handshake = require("./handshake.js");
+var socket = require('./socket.js');
 
 // Libraries
 var noble = require('noble');
@@ -126,7 +127,9 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 	else locked = 1;
 
 	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
-	if ((activePeripherals[getUserUUID(peripheral)] == undefined) || doesPeripheralNeedChecking(getUserUUID(peripheral))) {
+	if ((activePeripherals[getUserUUID(peripheral)] === undefined) ||
+		doesPeripheralNeedChecking(getUserUUID(peripheral)) ||
+		socket.getLoginId() === getUserUUID(peripheral)) {
 
 		stopScanning();
 

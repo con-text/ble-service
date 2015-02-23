@@ -13,7 +13,7 @@ var fs  = require('fs');
 var JsonSocket = require('json-socket');
 
 // Wearable ID to initiate login sequence with
-var loginID = "EA8F2A44";
+var loginID = '';
 
 // Simulate data for the front-end
 function getMockData() {
@@ -99,6 +99,14 @@ server.on('connection', function(socket) {
 		console.log("Error occured", err);
 	});
 
+	socket.on('message', function(payload) {
+
+		if(payload.request === "buzz") {
+			loginID = payload.data;
+			console.log("Got buzz request from", loginID);
+		}
+	});
+
 	// On Ctrl-C exit
 	process.on( 'SIGINT', function() {
 
@@ -127,5 +135,11 @@ fs.exists(socketName, function(exists) {
 });
 
 module.exports = {
-  loginID: loginID
+	getLoginId: function() {
+		return loginID;
+	},
+
+	resetLoginId: function() {
+		loginID = '';
+	}
 };

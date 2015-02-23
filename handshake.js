@@ -15,9 +15,9 @@ var request = require('request');
 var colors = require('colors');
 
 var handshakeSM = new machina.Fsm( {
- 
+
 	initialize: function( options ) {},
- 
+
 	namespace: "handshakeSM",
 	initialState: "uninitialized",
 	peripheral: "",
@@ -26,7 +26,7 @@ var handshakeSM = new machina.Fsm( {
 	ourBlock: "",
 	encryptedBlockFromOracle: "",
 	encryptedBlockFromWearable: "",
- 
+
 	states: {
 		uninitialized: {
 			"*": function() {
@@ -76,8 +76,8 @@ var handshakeSM = new machina.Fsm( {
 
 			_onExit: function() {
 				clearTimeout( this.timer );
-			}			
-		},		
+			}
+		},
 		writeChannelFound: {
 
 			// In connected state, inform wearable if login or heartbeat
@@ -88,10 +88,10 @@ var handshakeSM = new machina.Fsm( {
 			_onEnter: function() {
 				console.log("---In writeChannelFound state with " + this.wearableID);
 
-				if (socket.loginID == this.wearableID) {
+				if (socket.getLoginId() === this.wearableID) {
 					console.log("---Sending login");
 					bluetooth.writeMessage("login");
-					socket.loginID = "";
+          socket.resetLoginId();
 				} else {
 					console.log("---Sending heartbeat");
 					bluetooth.writeMessage("heartbeat");
@@ -117,7 +117,7 @@ var handshakeSM = new machina.Fsm( {
 
 			_onExit: function() {
 				clearTimeout( this.timer );
-			}			
+			}
 		},
 		encryptBlockViaOracle: {
 
@@ -147,7 +147,7 @@ var handshakeSM = new machina.Fsm( {
 
 			_onExit: function() {
 				clearTimeout( this.timer );
-			}	
+			}
 		},
 		sendCiphertextToWearable: {
 
@@ -194,12 +194,12 @@ var handshakeSM = new machina.Fsm( {
 				// Generate 128-bit random binary data
 				console.log("---Sending random block to the wearable:");
 				this.ourBlock = crypto.randomBytes(16).toString('hex').toUpperCase();
-				console.log(this.ourBlock.toString('hex'));				
+				console.log(this.ourBlock.toString('hex'));
 				bluetooth.writeMessage(this.ourBlock.toString('hex'));
 
 				this.timer = setTimeout( function() {
                     this.handle( "timeout" );
-                }.bind( this ), 5000 );		
+                }.bind( this ), 5000 );
 			},
 
 			_reset: "discovery",
@@ -232,7 +232,7 @@ var handshakeSM = new machina.Fsm( {
 
 				this.timer = setTimeout( function() {
                     this.handle( "timeout" );
-                }.bind( this ), 7000 );	
+                }.bind( this ), 7000 );
 			},
 
 			_reset: "discovery",
@@ -266,7 +266,7 @@ var handshakeSM = new machina.Fsm( {
 					state: "active",
 					lastConnectionTime: Date.now()
 				}
-				
+
 				bluetooth.activePeripherals[this.wearableID] = peripheralData;
 				bluetooth.removePeripheralFromChecking(this.wearableID);
 				console.log(JSON.stringify(bluetooth))
@@ -291,7 +291,7 @@ var handshakeSM = new machina.Fsm( {
 			}
 		}
 	},
- 
+
 	reset: function() {
 		console.log("---Resetting state machine".bold.cyan)
 		this.wearableID = "";
@@ -320,7 +320,7 @@ var handshakeSM = new machina.Fsm( {
 
 	receiveDecryptedBlockFromOracle: function(block) {
 		this.handle( "receiveDecryptedBlockFromOracle", block );
-	},	
+	},
 
 } );
 
