@@ -6,9 +6,13 @@ var argv = require('yargs')
 					.argv;
 
 var request = require('request');
+var keyMirror = require('keyMirror');
 
 var useMockData = false;
 var updateInterval = 5000;
+
+var messageCodes = keyMirror({activePeripherals: null, loginStatus: null});
+
 
 // Change parameters for mock data
 if (process.argv.length > 2 && process.argv[2] === "--mock") useMockData = true; 
@@ -29,3 +33,4 @@ exports.printBLEMessage = function(message)
 
 exports.useMockData = useMockData;
 exports.updateInterval = updateInterval;
+exports.messageCodes = messageCodes;

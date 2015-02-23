@@ -26,6 +26,7 @@ var handshakeSM = new machina.Fsm( {
 	ourBlock: "",
 	encryptedBlockFromOracle: "",
 	encryptedBlockFromWearable: "",
+	purpose: "",
 
 	states: {
 		uninitialized: {
@@ -89,10 +90,12 @@ var handshakeSM = new machina.Fsm( {
 				console.log("---In writeChannelFound state with " + this.wearableID);
 
 				if (socket.getLoginId() === this.wearableID) {
+					this.purpose = "login";
 					console.log("---Sending login");
 					bluetooth.writeMessage("login");
-          socket.resetLoginId();
+          			socket.resetLoginId();
 				} else {
+					this.purpose = "heartbeat";
 					console.log("---Sending heartbeat");
 					bluetooth.writeMessage("heartbeat");
 				}
@@ -267,6 +270,11 @@ var handshakeSM = new machina.Fsm( {
 					lastConnectionTime: Date.now()
 				}
 
+				// Inform the front-end that the login was successful
+				if (this.purpose === "login") {
+					socket.sendMessage(common.messageCodes.loginStatus, "success");
+				}
+
 				bluetooth.activePeripherals[this.wearableID] = peripheralData;
 				bluetooth.removePeripheralFromChecking(this.wearableID);
 				console.log(JSON.stringify(bluetooth))
@@ -283,8 +291,15 @@ var handshakeSM = new machina.Fsm( {
 			_onEnter: function() {
 				console.log("---In unsuccessfulHandshake State".bold.red);
 				console.log(JSON.stringify(bluetooth))
+
+				// Inform the front-end that the login failed
+				if (this.purpose === "login") {
+					socket.sendMessage(common.messageCodes.loginStatus, "fail");
+				}
+
 				// Trigger a disconnection from the device
 				bluetooth.disconnectFromDevice(this.peripheral);
+
 			},
 			_reset: "discovery",
 			_onExit: function() {
@@ -299,6 +314,7 @@ var handshakeSM = new machina.Fsm( {
 		this.ourBlock = "";
 		this.encryptedBlockFromOracle = "";
 		this.encryptedBlockFromWearable = "";
+		this.purpose = "";
 		this.handle( "_reset" );
 	},
 

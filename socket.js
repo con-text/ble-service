@@ -12,6 +12,8 @@ var net = require('net');
 var fs  = require('fs');
 var JsonSocket = require('json-socket');
 
+var socketRef = null;
+
 // Wearable ID to initiate login sequence with
 var loginID = '';
 
@@ -59,6 +61,7 @@ server.on('connection', function(socket) {
 
 	// Decorate with Json Socket
 	socket = new JsonSocket(socket);
+	socketRef = socket;
 
 	// Check the state of active devices, and reauthenticate if necessary
 	var intervaHandle = setInterval(function(){
@@ -77,24 +80,28 @@ server.on('connection', function(socket) {
 				clients: users
 			};
 
-
 		} else {
 
 			// Get active users from bluetooth
 			data = bluetooth.activePeripheralsToUserData();
 		}
 
+		// Create message for socket with appropriate code
+		var message = createMessage(common.messageCodes.activePeripherals, data);
+
 		// Write data to the socket
-		socket.sendMessage(data);
+		socket.sendMessage(message);
 
 	}, common.updateInterval);
 
 	socket.on('end', function() {
+		socketRef = null;
 		clearInterval(intervaHandle);
 		console.log('Client disconnected');
 	});
 
 	socket.on('error', function(err) {
+		socketRef = null;
 		clearInterval(intervaHandle);
 		console.log("Error occured", err);
 	});
@@ -119,6 +126,14 @@ server.on('connection', function(socket) {
 
 });
 
+function createMessage(code, data) {
+	var message = {
+		messageCode: code,
+		data: data
+	}
+
+	return message;
+}
 
 // Listen to the front-end socket
 var socketName = "/tmp/ble.sock";
@@ -141,5 +156,12 @@ module.exports = {
 
 	resetLoginId: function() {
 		loginID = '';
+	},
+
+	sendMessage: function(code, data) {
+		if (socketRef != null) {
+			var message = createMessage(code, data);
+			socketRef.sendMessage(message);
+		}
 	}
 };

@@ -6,11 +6,12 @@
   "dependencies": {
     "colors": "^1.0.3",
     "crypto": "0.0.3",
+    "json-socket": "*",
+    "keymirror": "^0.1.1",
     "machina": "^1.0.0-1",
     "noble": "^0.3.7",
     "request": "^2.53.0",
-    "yargs": "^1.3.3",
-    "json-socket": "*"
+    "yargs": "^1.3.3"
   },
   "devDependencies": {},
   "scripts": {
