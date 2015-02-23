@@ -128,9 +128,9 @@ server.on('connection', function(socket) {
 
 function createMessage(code, data) {
 	var message = {
-		messageCode: code,
+		code: code,
 		data: data
-	}
+	};
 
 	return message;
 }
