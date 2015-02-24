@@ -128,7 +128,7 @@ var onServiceDiscoveredCallback = function(services) {
 	}
 };
 
-var onDeviceDiscoveredCallback = function(peripheral) {
+function onDeviceDiscoveredCallback(peripheral) {
 
 	common.printBLEMessage('on -> discover: ' + peripheral);
 
