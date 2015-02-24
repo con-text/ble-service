@@ -41,7 +41,6 @@ function getRandomSubarray(arr, size) {
 				shuffled[i] = temp;
 		}
 		var res = [arr[0]].concat(shuffled.slice(0, size));
-		console.log(res);
 		return res;
 }
 
@@ -111,6 +110,17 @@ server.on('connection', function(socket) {
 		if(payload.request === "buzz") {
 			loginID = payload.data;
 			console.log("Got buzz request from", loginID);
+
+			if(common.useMockData) {
+				// Simulate feedback
+				setTimeout(function() {
+					var message = createMessage(common.messageCodes.loginStatus, {
+							result: "success",
+							userId: loginID
+					});
+					socket.sendMessage(message);
+				}, 1500);
+			}
 		}
 	});
 
@@ -159,7 +169,7 @@ module.exports = {
 	},
 
 	sendMessage: function(code, data) {
-		if (socketRef != null) {
+		if (socketRef !== null) {
 			var message = createMessage(code, data);
 			socketRef.sendMessage(message);
 		}

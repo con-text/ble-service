@@ -15,8 +15,14 @@ var messageCodes = keyMirror({activePeripherals: null, loginStatus: null});
 
 
 // Change parameters for mock data
-if (process.argv.length > 2 && process.argv[2] === "--mock") useMockData = true; 
-if (useMockData) updateInterval: 15000;
+if (process.argv.length > 2 && process.argv[2] === "--mock") {
+	console.log("Using mock data.");
+	useMockData = true;
+}
+
+if (useMockData) {
+	updateInterval = 7000;
+}
 
 // Shim for IE8 Date.now
 exports.currentDate = function()
@@ -28,7 +34,9 @@ exports.currentDate = function()
 // Debug messages
 exports.printBLEMessage = function(message)
 {
-	if (argv.v == true) console.log(message);
+	if (argv.v === true) {
+		console.log(message);
+	}
 };
 
 exports.useMockData = useMockData;

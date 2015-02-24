@@ -9,30 +9,32 @@ var socket = require("./socket.js");
 
 setInterval(function(){
 
-	common.printBLEMessage("Current active users: " + JSON.stringify(bluetooth.activePeripherals))
-	common.printBLEMessage("Current stale users: " + JSON.stringify(bluetooth.needsCheckingQueue))
+	common.printBLEMessage("Current active users: " + JSON.stringify(bluetooth.activePeripherals));
+	common.printBLEMessage("Current stale users: " + JSON.stringify(bluetooth.needsCheckingQueue));
 
 	if(!common.useMockData) {
 
 		// Check each of the active peripherals
 		for (var peripheralKey in bluetooth.activePeripherals) {
 
+			var activePeripheral = bluetooth.activePeripherals[peripheralKey];
+
 			// If we last saw the peripheral over 15s ago, but less than a minute
-			if ((bluetooth.activePeripherals[peripheralKey]["lastConnectionTime"] < (common.currentDate() - 15000))
-				&& bluetooth.activePeripherals[peripheralKey]["lastConnectionTime"] > (common.currentDate() - 60000)) {
+			if (activePeripheral.lastConnectionTime < (common.currentDate() - 15000) &&
+				activePeripheral.lastConnectionTime > (common.currentDate() - 60000)) {
 
 				// Is it already in the needsChecking queue?
 				for (var i = 0; i < bluetooth.needsCheckingQueue.length; i++) {
 					if (bluetooth.needsCheckingQueue[i][0] == peripheralKey) {
-						bluetooth.activePeripherals[peripheralKey]["state"] = "stale";
+						bluetooth.activePeripherals[peripheralKey].state = "stale";
 						return;
 					}
 				}
 
 				// It wasn't in the needsChecking queue so add it in
-				bluetooth.needsCheckingQueue.push([peripheralKey, bluetooth.activePeripherals[peripheralKey]])
+				bluetooth.needsCheckingQueue.push([peripheralKey, activePeripheral]);
 
-			} else if (bluetooth.activePeripherals[peripheralKey]["lastConnectionTime"] < (common.currentDate() - 60000)) {
+			} else if (activePeripheral.lastConnectionTime < (common.currentDate() - 60000)) {
 				common.printBLEMessage("Deleting " + peripheralKey + " at " + Date.now());
 
 				// It's been over a minute since we connected to the peripheral, delete it from active
