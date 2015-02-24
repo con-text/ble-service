@@ -21,7 +21,7 @@ if (process.argv.length > 2 && process.argv[2] === "--mock") {
 }
 
 if (useMockData) {
-	updateInterval = 15000;
+	updateInterval = 7000;
 }
 
 // Shim for IE8 Date.now
