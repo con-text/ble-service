@@ -26,22 +26,28 @@ var writeChannel = null;
 var disconnectChannel = null;
 var readString = "";
 
-noble.on('stateChange', function(state) {
-	common.printBLEMessage('on -> stateChange: ' + state);
-	if (state === 'poweredOn') startScanning();
-	else stopScanning();
-});
+// Don't use noble if mock data is being used
+if(!common.useMockData) {
 
-noble.on('scanStart', function() {
-	common.printBLEMessage('on -> scanStart');
-});
+	noble.on('stateChange', function(state) {
+		common.printBLEMessage('on -> stateChange: ' + state);
+		if (state === 'poweredOn') startScanning();
+		else stopScanning();
+	});
 
-noble.on('scanStop', function() {
-	common.printBLEMessage('on -> scanStop');
-});
+	noble.on('scanStart', function() {
+		common.printBLEMessage('on -> scanStart');
+	});
+
+	noble.on('scanStop', function() {
+		common.printBLEMessage('on -> scanStop');
+	});
+
+	noble.on('discover', onDeviceDiscoveredCallback);
+}
 
 function startScanning() {
-	if (isScanning == false) {
+	if (isScanning === false) {
 		var serviceUUIDs = [userServiceUUID]; // default: [] => all
 		var allowDuplicates = true;
 
@@ -52,14 +58,14 @@ function startScanning() {
 }
 
 function stopScanning() {
-	if (isScanning == true) {
+	if (isScanning === true) {
 		noble.stopScanning();
 		isScanning = false;
 	}
 }
 
 function disconnectFromDevice(peripheral) {
-	if (disconnectChannel != null) {
+	if (disconnectChannel !== null) {
 		console.log("Sending Disconnect");
 		disconnectChannel.write(new Buffer("", "utf-8"));
 		peripheral.disconnect();
@@ -68,10 +74,13 @@ function disconnectFromDevice(peripheral) {
 
 function activePeripheralsToUserData() {
 	data = {};
-	data["clients"] = [];
+	data.clients = [];
 
 	for (var peripheral in activePeripherals) {
-		data["clients"].push({id: peripheral, state: activePeripherals[peripheral]["state"]})
+		data.clients.push({
+			id: peripheral,
+			state: activePeripherals[peripheral].state
+		});
 	}
 
 	return data;
@@ -94,14 +103,14 @@ function removePeripheralFromChecking(uuid) {
 var onCharacteristicsDiscoveredCallback = function(characteristics) {
 	for (var characteristicID in characteristics) {
 		characteristic = characteristics[characteristicID];
-		if (characteristic["uuid"] === readCharacteristicUUID) {
+		if (characteristic.uuid === readCharacteristicUUID) {
 			readChannel = characteristic;
 			readChannel.notify(true);
 			readChannel.on('read', onReadMessage);
-		} else if (characteristic["uuid"] === writeCharacteristicUUID) {
+		} else if (characteristic.uuid === writeCharacteristicUUID) {
 			writeChannel = characteristic;
 			handshake.handshakeSM.writeChannelFound();
-		} else if (characteristic["uuid"] === disconnectCharacteristicUUID) {
+		} else if (characteristic.uuid === disconnectCharacteristicUUID) {
 			disconnectChannel = characteristic;
 		}
 	}
@@ -110,7 +119,7 @@ var onCharacteristicsDiscoveredCallback = function(characteristics) {
 var onServiceDiscoveredCallback = function(services) {
 	for (var serviceID in services) {
 		service = services[serviceID];
-		if (service["uuid"] === userServiceUUID) {
+		if (service.uuid === userServiceUUID) {
 			service.on('characteristicsDiscover', onCharacteristicsDiscoveredCallback);
 
 			// Discover the characteristics
@@ -123,7 +132,8 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 
 	common.printBLEMessage('on -> discover: ' + peripheral);
 
-	if (locked != 0) return;
+	if (locked !== 0)
+		return;
 	else locked = 1;
 
 	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
@@ -144,7 +154,7 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 			writeChannel = null;
 			disconnectChannel = null;
 
-			common.printBLEMessage("Disconnected....Starting to scan again")
+			common.printBLEMessage("Disconnected....Starting to scan again");
 			handshake.handshakeSM.reset();
 			locked = 0;
 			startScanning();
@@ -171,8 +181,6 @@ var onDeviceDiscoveredCallback = function(peripheral) {
 
 };
 
-noble.on('discover', onDeviceDiscoveredCallback);
-
 function getUserUUID(peripheral)
 {
 	return peripheral.advertisement.manufacturerData.slice(2).toString();
@@ -184,7 +192,7 @@ function writeMessage(message) {
 
 	message = message.toUpperCase();
 
-	if (writeChannel != null) {
+	if (writeChannel !== null) {
 
 		// Send the first packet
 		var currentSubMessage = "1";
@@ -212,7 +220,7 @@ function readMessage(message) {
 }
 
 function rawWriteMessage(message) {
-	if (writeChannel != null) {
+	if (writeChannel !== null) {
 		var bufferString = new Buffer(message, "utf-8");
 		writeChannel.write(bufferString);
 		common.printBLEMessage("Sending message: " + message);
@@ -233,14 +241,14 @@ var onReadMessage = function rawReadMessage(data, isNotification) {
 
 	// Read the next data packet
 	if(dataString[0] == '2') {
-		for (var i = 1; i < dataString.length; i++) {
-			readString += dataString[i];
+		for (var j = 1; j < dataString.length; j++) {
+			readString += dataString[j];
 		}
 	}
 
 	// Read EOM
-	if(dataString[0] == '3') {
-		if (readString != "") readMessage(readString);
+	if(dataString[0] == '3' && readString !== "") {
+			readMessage(readString);
 	}
 
 };

@@ -272,7 +272,10 @@ var handshakeSM = new machina.Fsm( {
 
 				// Inform the front-end that the login was successful
 				if (this.purpose === "login") {
-					socket.sendMessage(common.messageCodes.loginStatus, "success");
+					socket.sendMessage(common.messageCodes.loginStatus, {
+						result: "success",
+						userId: this.wearableID
+					});
 				}
 
 				bluetooth.activePeripherals[this.wearableID] = peripheralData;
@@ -294,7 +297,10 @@ var handshakeSM = new machina.Fsm( {
 
 				// Inform the front-end that the login failed
 				if (this.purpose === "login") {
-					socket.sendMessage(common.messageCodes.loginStatus, "fail");
+					socket.sendMessage(common.messageCodes.loginStatus, {
+							result: "fail",
+							userId: this.wearableID
+					});
 				}
 
 				// Trigger a disconnection from the device
