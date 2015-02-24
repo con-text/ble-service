@@ -6,7 +6,7 @@ var argv = require('yargs')
 					.argv;
 
 var request = require('request');
-var keyMirror = require('keyMirror');
+var keyMirror = require('key-mirror');
 
 var useMockData = false;
 var updateInterval = 5000;

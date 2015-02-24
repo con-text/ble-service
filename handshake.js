@@ -345,6 +345,8 @@ function encryptBlock(uuid, plaintext) {
 	request('http://contexte.herokuapp.com/auth/stage1/' + uuid + '/' + plaintext, function (error, response, body) {
 		if (!error && response.statusCode == 200) {
 			handshakeSM.receiveEncryptedBlockFromOracle(JSON.parse(body)["message"]);
+		} else {
+			console.log("There was a problem.")
 		}
 	});
 }
@@ -354,6 +356,8 @@ function decryptBlock(uuid, ciphertext) {
 	request('http://contexte.herokuapp.com/auth/stage2/' + uuid + '/' + ciphertext, function (error, response, body) {
 		if (!error && response.statusCode == 200) {
 			handshakeSM.receiveDecryptedBlockFromOracle(JSON.parse(body)["message"]);
+		} else {
+			console.log("There was a problem.")
 		}
 	});
 }
