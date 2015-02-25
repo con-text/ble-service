@@ -179,7 +179,7 @@ function onDeviceDiscoveredCallback(peripheral) {
 		startScanning();
 	}
 
-};
+}
 
 function getUserUUID(peripheral)
 {

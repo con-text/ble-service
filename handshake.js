@@ -161,7 +161,7 @@ var handshakeSM = new machina.Fsm( {
 
 				console.log("---Sending ciphertext to the wearable:");
 				console.log(this.encryptedBlockFromOracle);
-				bluetooth.writeMessage(this.encryptedBlockFromOracle)
+				bluetooth.writeMessage(this.encryptedBlockFromOracle);
 
 				this.timer = setTimeout( function() {
 					this.handle( "timeout" );
@@ -268,7 +268,7 @@ var handshakeSM = new machina.Fsm( {
 				var peripheralData = {
 					state: "active",
 					lastConnectionTime: Date.now()
-				}
+				};
 
 				// Inform the front-end that the login was successful
 				if (this.purpose === "login") {
@@ -280,7 +280,7 @@ var handshakeSM = new machina.Fsm( {
 
 				bluetooth.activePeripherals[this.wearableID] = peripheralData;
 				bluetooth.removePeripheralFromChecking(this.wearableID);
-				console.log(JSON.stringify(bluetooth))
+				console.log(JSON.stringify(bluetooth));
 				bluetooth.disconnectFromDevice(this.peripheral);
 			},
 			_reset: "discovery",
@@ -293,7 +293,7 @@ var handshakeSM = new machina.Fsm( {
 
 			_onEnter: function() {
 				console.log("---In unsuccessfulHandshake State".bold.red);
-				console.log(JSON.stringify(bluetooth))
+				console.log(JSON.stringify(bluetooth));
 
 				// Inform the front-end that the login failed
 				if (this.purpose === "login") {
@@ -314,7 +314,7 @@ var handshakeSM = new machina.Fsm( {
 	},
 
 	reset: function() {
-		console.log("---Resetting state machine".bold.cyan)
+		console.log("---Resetting state machine".bold.cyan);
 		this.wearableID = "";
 		this.wearableData = "";
 		this.ourBlock = "";
@@ -350,9 +350,9 @@ var handshakeSM = new machina.Fsm( {
 function encryptBlock(uuid, plaintext) {
 	request('http://contexte.herokuapp.com/auth/stage1/' + uuid + '/' + plaintext, function (error, response, body) {
 		if (!error && response.statusCode == 200) {
-			handshakeSM.receiveEncryptedBlockFromOracle(JSON.parse(body)["message"]);
+			handshakeSM.receiveEncryptedBlockFromOracle(JSON.parse(body).message);
 		} else {
-			console.log("There was a problem.")
+			console.log("There was a problem.");
 		}
 	});
 }
@@ -361,9 +361,9 @@ function encryptBlock(uuid, plaintext) {
 function decryptBlock(uuid, ciphertext) {
 	request('http://contexte.herokuapp.com/auth/stage2/' + uuid + '/' + ciphertext, function (error, response, body) {
 		if (!error && response.statusCode == 200) {
-			handshakeSM.receiveDecryptedBlockFromOracle(JSON.parse(body)["message"]);
+			handshakeSM.receiveDecryptedBlockFromOracle(JSON.parse(body).message);
 		} else {
-			console.log("There was a problem.")
+			console.log("There was a problem.");
 		}
 	});
 }
