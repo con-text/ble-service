@@ -17,6 +17,9 @@ var socketRef = null;
 // Wearable ID to initiate login sequence with
 var loginID = '';
 
+// Session ID
+var sid = '';
+
 // Simulate data for the front-end
 function getMockData() {
 
@@ -109,6 +112,7 @@ server.on('connection', function(socket) {
 
 		if(payload.request === "buzz") {
 			loginID = payload.data;
+			sid = payload.sid;
 			console.log("Got buzz request from", loginID);
 
 			if(common.useMockData) {
@@ -116,7 +120,8 @@ server.on('connection', function(socket) {
 				setTimeout(function() {
 					var message = createMessage(common.messageCodes.loginStatus, {
 							result: "success",
-							userId: loginID
+							userId: loginID,
+							sid: payload.sid
 					});
 					socket.sendMessage(message);
 				}, 1500);
@@ -160,12 +165,16 @@ fs.exists(socketName, function(exists) {
 });
 
 module.exports = {
-	getLoginId: function() {
-		return loginID;
+	getLoginData: function() {
+		return {
+			id: loginID,
+			sid: sid
+		};
 	},
 
 	resetLoginId: function() {
 		loginID = '';
+		sid = '';
 	},
 
 	sendMessage: function(code, data) {

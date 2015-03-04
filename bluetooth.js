@@ -139,7 +139,7 @@ function onDeviceDiscoveredCallback(peripheral) {
 	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
 	if ((activePeripherals[getUserUUID(peripheral)] === undefined) ||
 		doesPeripheralNeedChecking(getUserUUID(peripheral)) ||
-		socket.getLoginId() === getUserUUID(peripheral)) {
+		socket.getLoginData().id === getUserUUID(peripheral)) {
 
 		stopScanning();
 

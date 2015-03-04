@@ -89,7 +89,7 @@ var handshakeSM = new machina.Fsm( {
 			_onEnter: function() {
 				console.log("---In writeChannelFound state with " + this.wearableID);
 
-				if (socket.getLoginId() === this.wearableID) {
+				if (socket.getLoginData().id === this.wearableID) {
 					this.purpose = "login";
 					console.log("---Sending login");
 					bluetooth.writeMessage("login");
@@ -274,7 +274,8 @@ var handshakeSM = new machina.Fsm( {
 				if (this.purpose === "login") {
 					socket.sendMessage(common.messageCodes.loginStatus, {
 						result: "success",
-						userId: this.wearableID
+						userId: this.wearableID,
+						sid: socket.getLoginData().sid
 					});
 				}
 
