@@ -301,7 +301,8 @@ var handshakeSM = new machina.Fsm( {
 				if (this.purpose === "login") {
 					socket.sendMessage(common.messageCodes.loginStatus, {
 							result: "fail",
-							userId: this.wearableID
+							userId: this.wearableID,
+							sid: socket.getLoginData().sid
 					});
 
 					socket.resetLoginId();
