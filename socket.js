@@ -75,7 +75,7 @@ server.on('connection', function(socket) {
 			// Take random array elements
 			var allMockUsers = getMockData();
 
-			var users = getRandomSubarray(allMockUsers, getRandomInt(0,
+			var users = getRandomSubarray(allMockUsers, getRandomInt(allMockUsers.length,
 				allMockUsers.length));
 
 			data = {
