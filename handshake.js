@@ -93,7 +93,6 @@ var handshakeSM = new machina.Fsm( {
 					this.purpose = "login";
 					console.log("---Sending login");
 					bluetooth.writeMessage("login");
-		  			socket.resetLoginId();
 				} else {
 					this.purpose = "heartbeat";
 					console.log("---Sending heartbeat");
@@ -277,6 +276,8 @@ var handshakeSM = new machina.Fsm( {
 						userId: this.wearableID,
 						sid: socket.getLoginData().sid
 					});
+
+					socket.resetLoginId();
 				}
 
 				bluetooth.activePeripherals[this.wearableID] = peripheralData;
@@ -300,8 +301,11 @@ var handshakeSM = new machina.Fsm( {
 				if (this.purpose === "login") {
 					socket.sendMessage(common.messageCodes.loginStatus, {
 							result: "fail",
-							userId: this.wearableID
+							userId: this.wearableID,
+							sid: socket.getLoginData().sid
 					});
+
+					socket.resetLoginId();
 				}
 
 				// Trigger a disconnection from the device
