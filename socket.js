@@ -25,7 +25,7 @@ function getMockData() {
 
 	// Some mock users
 	var users = [
-			{id: 'EA8F2A44', state: 'active' },
+			{id: '1234567', state: 'active' },
 			{id: 'ABC1231', state: 'active' },
 			{id: 'tester', state: 'active' },
 			{id: 'ABC1232', state: 'stale' }
