@@ -57,6 +57,7 @@ var handshakeSM = new machina.Fsm( {
 		connected: {
 
 			_onEnter: function() {
+				console.log(JSON.stringify(bluetooth.activePeripherals));
 				console.log("---In connected state with " + this.wearableID);
 
 				this.timer = setTimeout( function() {
@@ -266,7 +267,7 @@ var handshakeSM = new machina.Fsm( {
 				console.log("---In successfulHandshake State".bold.green);
 				var peripheralData = {
 					state: "active",
-					lastConnectionTime: Date.now()
+					lastConnectionTime: parseInt(Date.now()/1000)
 				};
 
 				// Inform the front-end that the login was successful
@@ -282,8 +283,9 @@ var handshakeSM = new machina.Fsm( {
 
 				bluetooth.activePeripherals[this.wearableID] = peripheralData;
 				bluetooth.removePeripheralFromChecking(this.wearableID);
-				console.log(JSON.stringify(bluetooth));
+				//console.log(JSON.stringify(bluetooth));
 				bluetooth.disconnectFromDevice(this.peripheral);
+				console.log(JSON.stringify(bluetooth.activePeripherals));
 			},
 			_reset: "discovery",
 			_onExit: function() {

@@ -20,8 +20,8 @@ setInterval(function(){
 			var activePeripheral = bluetooth.activePeripherals[peripheralKey];
 
 			// If we last saw the peripheral over 10s ago, but less than a minute
-			if (activePeripheral.lastConnectionTime < (common.currentDate() - 10000) &&
-				activePeripheral.lastConnectionTime > (common.currentDate() - 60000)) {
+			if (activePeripheral.lastConnectionTime < (common.currentDate() - 8) &&
+				activePeripheral.lastConnectionTime > (common.currentDate() - 60)) {
 
 				// Is it already in the needsChecking queue?
 				for (var i = 0; i < bluetooth.needsCheckingQueue.length; i++) {
@@ -34,7 +34,7 @@ setInterval(function(){
 				// It wasn't in the needsChecking queue so add it in
 				bluetooth.needsCheckingQueue.push([peripheralKey, activePeripheral]);
 
-			} else if (activePeripheral.lastConnectionTime < (common.currentDate() - 60000)) {
+			} else if (activePeripheral.lastConnectionTime < (common.currentDate() - 60)) {
 				common.printBLEMessage("Deleting " + peripheralKey + " at " + Date.now());
 
 				// It's been over a minute since we connected to the peripheral, delete it from active

@@ -27,13 +27,14 @@ if (useMockData) {
 // Shim for IE8 Date.now
 exports.currentDate = function()
 {
-	if (Date.now) return Date.now();
+	if (Date.now) return parseInt(Date.now()/1000);
 	else return new Date().getTime();
 };
 
 // Debug messages
 exports.printBLEMessage = function(message)
 {
+	//console.log(message);
 	if (argv.v === true) {
 		console.log(message);
 	}
