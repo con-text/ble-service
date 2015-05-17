@@ -26,6 +26,8 @@ var writeChannel = null;
 var disconnectChannel = null;
 var readString = "";
 
+var numIgnoredConnections = 0;
+
 // Don't use noble if mock data is being used
 if(!common.useMockData) {
 
@@ -132,14 +134,37 @@ function onDeviceDiscoveredCallback(peripheral) {
 
 	common.printBLEMessage('on -> discover: ' + peripheral);
 
-	if (locked !== 0)
-		return;
+	if (locked !== 0) return;
 	else locked = 1;
+
+	// If there was a buzz request, prioritise connecting to the device
+	if ((socket.getLoginData().id !== '') &&
+			(socket.getLoginData().id !== getUserUUID(peripheral))) {
+
+		numIgnoredConnections += 1;
+
+		if (numIgnoredConnections > 8) {
+			console.log("Resetting socket login");
+			socket.resetLoginId();
+		}
+		else {
+			console.log("Ignoring possible handshake, to help with login");
+			console.log("Num ignored: " + String(numIgnoredConnections));
+			locked = 0;
+			startScanning();
+			return;
+		}
+
+	}
 
 	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
 	if ((activePeripherals[getUserUUID(peripheral)] === undefined) ||
 		doesPeripheralNeedChecking(getUserUUID(peripheral)) ||
 		socket.getLoginData().id === getUserUUID(peripheral)) {
+
+		if (socket.getLoginData().id === getUserUUID(peripheral)) {
+			numIgnoredConnections = 0;
+		}
 
 		stopScanning();
 
