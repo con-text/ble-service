@@ -9,7 +9,7 @@ var request = require('request');
 var keyMirror = require('keymirror');
 
 var useMockData = false;
-var updateInterval = 5000;
+var updateInterval = 2500;
 
 var messageCodes = keyMirror({activePeripherals: null, loginStatus: null});
 
