@@ -19,8 +19,8 @@ setInterval(function(){
 
 			var activePeripheral = bluetooth.activePeripherals[peripheralKey];
 
-			// If we last saw the peripheral over 15s ago, but less than a minute
-			if (activePeripheral.lastConnectionTime < (common.currentDate() - 15) &&
+			// If we last saw the peripheral over 20s ago, but less than a minute
+			if (activePeripheral.lastConnectionTime < (common.currentDate() - 20) &&
 				activePeripheral.lastConnectionTime > (common.currentDate() - 60)) {
 
 				// Is it already in the needsChecking queue?
