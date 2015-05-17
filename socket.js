@@ -20,6 +20,9 @@ var loginID = '';
 // Session ID
 var sid = '';
 
+// Buzz code
+var code;
+
 // Simulate data for the front-end
 function getMockData() {
 
@@ -114,16 +117,37 @@ server.on('connection', function(socket) {
 		if(payload.request === "buzz") {
 			loginID = payload.data;
 			sid = payload.sid;
-			console.log("Got buzz request from", loginID);
+			code = parseInt(payload.code);
+			console.log('Got buzz request from: ' + loginID + ' with code ' + code);
 
 			if(common.useMockData) {
 				// Simulate feedback
 				setTimeout(function() {
-					var message = createMessage(common.messageCodes.loginStatus, {
-							result: "success",
-							userId: loginID,
-							sid: payload.sid
-					});
+
+					var message;
+
+					if(code === 0) {
+
+						// Authentication, send success
+						message = createMessage(common.messageCodes.loginStatus, {
+								result: "success",
+								userId: loginID,
+								sid: payload.sid
+						});
+
+					} else if(code === 1) {
+
+						// File share, send success
+						message = createMessage(common.messageCodes.loginStatus, {
+								result: "fileSuccess",
+								userId: loginID,
+								sid: payload.sid
+						});
+
+					} else {
+						console.error("Unknown buzz code");
+					}
+
 					socket.sendMessage(message);
 				}, 1500);
 			}
