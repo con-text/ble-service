@@ -21,7 +21,7 @@ var loginID = '';
 var sid = '';
 
 // Buzz code
-var code;
+var code = 0;
 
 // Simulate data for the front-end
 function getMockData() {
@@ -118,7 +118,7 @@ server.on('connection', function(socket) {
 			loginID = payload.data;
 			sid = payload.sid;
 			code = parseInt(payload.code);
-			console.log('Got buzz request from: ' + loginID + ' with code ' + code);
+			//console.log('Got buzz request from: ' + loginID + ' with code ' + code);
 
 			if(common.useMockData) {
 				// Simulate feedback
@@ -193,13 +193,15 @@ module.exports = {
 	getLoginData: function() {
 		return {
 			id: loginID,
-			sid: sid
+			sid: sid,
+			code: code
 		};
 	},
 
 	resetLoginId: function() {
 		loginID = '';
 		sid = '';
+		code = 0;
 	},
 
 	sendMessage: function(code, data) {
