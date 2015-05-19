@@ -9,6 +9,7 @@ var socket = require('./socket.js');
 
 // Libraries
 var noble = require('noble');
+var colors = require('colors');
 
 // Constants
 var userServiceUUID = "2220";
@@ -193,7 +194,7 @@ function onDeviceDiscoveredCallback(peripheral) {
 			peripheral.once('servicesDiscover', onServiceDiscoveredCallback);
 		}
 
-		console.log("Found user with UUID: " + getUserUUID(peripheral));
+		console.log("Found user with UUID: " + getUserUUID(peripheral) + " and signal strength: " + colors.magenta(peripheral.rssi));
 
 		peripheral.connect(function(err) {
 			if (err) console.log(err);
