@@ -91,6 +91,8 @@ var handshakeSM = new machina.Fsm( {
 				console.log("---In writeChannelFound state with " + this.wearableID);
 
 				var loginData = socket.getLoginData();
+				console.info("Login data", loginData);
+
 				if (loginData.id === this.wearableID) {
 
 					if(loginData.code === 0) {
@@ -99,7 +101,7 @@ var handshakeSM = new machina.Fsm( {
 						console.log("---Sending login");
 						bluetooth.writeMessage("login");
 
-					} else if(loginData === 1) {
+					} else if(loginData.code === 1) {
 
 						this.purpose = "file";
 						console.log("---Sending file share approval");
@@ -297,6 +299,7 @@ var handshakeSM = new machina.Fsm( {
 						userId: this.wearableID,
 						sid: socket.getLoginData().sid
 					});
+					socket.resetLoginId();
 				}
 
 				bluetooth.activePeripherals[this.wearableID] = peripheralData;
