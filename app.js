@@ -9,8 +9,8 @@ var socket = require("./socket.js");
 
 setInterval(function(){
 
-	common.printBLEMessage("Current active users: " + JSON.stringify(bluetooth.activePeripherals));
-	common.printBLEMessage("Current stale users: " + JSON.stringify(bluetooth.needsCheckingQueue));
+	console.log("Current users: " + JSON.stringify(bluetooth.activePeripherals));
+	console.log("Needs checking: " + JSON.stringify(bluetooth.needsCheckingQueue));
 
 	if(!common.useMockData) {
 
@@ -26,7 +26,10 @@ setInterval(function(){
 				// Is it already in the needsChecking queue?
 				for (var i = 0; i < bluetooth.needsCheckingQueue.length; i++) {
 					if (bluetooth.needsCheckingQueue[i][0] == peripheralKey) {
-						bluetooth.activePeripherals[peripheralKey].state = "stale";
+						// Give us 10 seconds to try and find the device
+						if (activePeripheral.lastConnectionTime < (common.currentDate() - 30)) {
+							bluetooth.activePeripherals[peripheralKey].state = "stale";
+						}
 						return;
 					}
 				}
@@ -42,5 +45,6 @@ setInterval(function(){
 				bluetooth.removePeripheralFromChecking(peripheralKey);
 			}
 		}
+		
 	}
 }, common.updateInterval);
