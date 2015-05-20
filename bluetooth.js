@@ -138,75 +138,47 @@ function onDeviceDiscoveredCallback(peripheral) {
 	if (locked !== 0) return;
 	else locked = 1;
 
-/*	// If there was a buzz request, prioritise connecting to the device
-	if ((socket.getLoginData().id !== '') &&
-			(socket.getLoginData().id !== getUserUUID(peripheral))) {
-
-		numIgnoredConnections += 1;
-
-		if (numIgnoredConnections > 8) {
-			console.log("Resetting socket login");
-
-			socket.sendMessage(common.messageCodes.loginStatus, {
-				result: "fail",
-				userId: socket.getLoginData().id,
-				sid: socket.getLoginData().sid
-			});
-
-			socket.resetLoginId();
-		}
-		else {
-			console.log("Ignoring possible handshake, to help with login");
-			console.log("Num ignored: " + String(numIgnoredConnections));
-			locked = 0;
-			startScanning();
-			return;
-		}
-
-	}*/
-
 	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
 	if ((activePeripherals[getUserUUID(peripheral)] === undefined) ||
 		doesPeripheralNeedChecking(getUserUUID(peripheral)) ||
 		socket.getLoginData().id === getUserUUID(peripheral)) {
 
-		if (socket.getLoginData().id === getUserUUID(peripheral)) {
-			numIgnoredConnections = 0;
-		}
-
-		stopScanning();
-
-		peripheral.once('connect', function() {
-			common.printBLEMessage('on -> connect');
-			this.discoverServices();
-		});
-
-		peripheral.once('disconnect', function() {
-			// Reset the channels
-			readChannel = null;
-			writeChannel = null;
-			disconnectChannel = null;
-
-			common.printBLEMessage("Disconnected....Starting to scan again");
-			handshake.handshakeSM.reset();
-			locked = 0;
-			startScanning();
-		});
-
-		if (peripheral._events.servicesDiscover === undefined) {
-			peripheral.once('servicesDiscover', onServiceDiscoveredCallback);
-		}
-
 		console.log("Found user with UUID: " + getUserUUID(peripheral) + " and signal strength: " + colors.magenta(peripheral.rssi));
 
 		// if we're connected to the wearable already, handshake with it
-		if (handshake.loggedIn === getUserUUID(peripheral) ||
-				socket.getLoginData().id === getUserUUID(peripheral)) {
+		if (handshake.getLoggedIn() === getUserUUID(peripheral) ||
+			socket.getLoginData().id === getUserUUID(peripheral)) {
+
+			stopScanning();
+
+			peripheral.once('connect', function() {
+				common.printBLEMessage('on -> connect');
+				this.discoverServices();
+			});
+
+			peripheral.once('disconnect', function() {
+				// Reset the channels
+				readChannel = null;
+				writeChannel = null;
+				disconnectChannel = null;
+
+				common.printBLEMessage("Disconnected....Starting to scan again");
+				handshake.handshakeSM.reset();
+				locked = 0;
+				startScanning();
+			});
+
+			if (peripheral._events.servicesDiscover === undefined) {
+				peripheral.once('servicesDiscover', onServiceDiscoveredCallback);
+			}
+
 			peripheral.connect(function(err) {
 				if (err) console.log(err);
 				else handshake.handshakeSM.connectedToWearable(peripheral, getUserUUID(peripheral));
 			});
+
 		} else  {
+
 			// Otherwise display the device as somebody around
 			var peripheralData = {
 				state: "active",
@@ -215,6 +187,11 @@ function onDeviceDiscoveredCallback(peripheral) {
 
 			activePeripherals[getUserUUID(peripheral)] = peripheralData;
 			removePeripheralFromChecking(getUserUUID(peripheral));
+
+			// Reset the channels
+			readChannel = null;
+			writeChannel = null;
+			disconnectChannel = null;
 
 			locked = 0;
 			startScanning();

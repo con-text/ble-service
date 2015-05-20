@@ -16,6 +16,14 @@ var colors = require('colors');
 
 var loggedIn = "";
 
+function getLoggedIn() {
+	return loggedIn;
+}
+
+function resetLoggedIn() {
+	loggedIn = "";
+}
+
 var handshakeSM = new machina.Fsm( {
 
 	initialize: function( options ) {},
@@ -294,7 +302,7 @@ var handshakeSM = new machina.Fsm( {
 						sid: socket.getLoginData().sid
 					});
 
-					loggedIn = this.wearableID
+					loggedIn = this.wearableID;
 
 					socket.resetLoginId();
 				} else if(this.purpose === "file") {
@@ -400,7 +408,6 @@ function decryptBlock(uuid, ciphertext) {
 	});
 }
 
-module.exports = {
-  handshakeSM: handshakeSM,
-	loggedIn: loggedIn
-};
+exports.handshakeSM = handshakeSM;
+exports.getLoggedIn = getLoggedIn;
+exports.resetLoggedIn = resetLoggedIn;

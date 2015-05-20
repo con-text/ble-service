@@ -5,6 +5,7 @@
 // Modules
 var common = require("./common.js");
 var bluetooth = require("./bluetooth.js");
+var handshake = require("./handshake.js");
 var socket = require("./socket.js");
 
 setInterval(function(){
