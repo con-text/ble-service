@@ -138,7 +138,7 @@ function onDeviceDiscoveredCallback(peripheral) {
 	if (locked !== 0) return;
 	else locked = 1;
 
-	// If there was a buzz request, prioritise connecting to the device
+/*	// If there was a buzz request, prioritise connecting to the device
 	if ((socket.getLoginData().id !== '') &&
 			(socket.getLoginData().id !== getUserUUID(peripheral))) {
 
@@ -146,13 +146,13 @@ function onDeviceDiscoveredCallback(peripheral) {
 
 		if (numIgnoredConnections > 8) {
 			console.log("Resetting socket login");
-			
+
 			socket.sendMessage(common.messageCodes.loginStatus, {
 				result: "fail",
 				userId: socket.getLoginData().id,
 				sid: socket.getLoginData().sid
 			});
-			
+
 			socket.resetLoginId();
 		}
 		else {
@@ -163,7 +163,7 @@ function onDeviceDiscoveredCallback(peripheral) {
 			return;
 		}
 
-	}
+	}*/
 
 	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
 	if ((activePeripherals[getUserUUID(peripheral)] === undefined) ||
@@ -193,20 +193,33 @@ function onDeviceDiscoveredCallback(peripheral) {
 			startScanning();
 		});
 
-		//peripheral.once('rssiUpdate', function(rssi) {
-		//	common.printBLEMessage('on -> RSSI update ' + rssi);
-		//});
-
 		if (peripheral._events.servicesDiscover === undefined) {
 			peripheral.once('servicesDiscover', onServiceDiscoveredCallback);
 		}
 
 		console.log("Found user with UUID: " + getUserUUID(peripheral) + " and signal strength: " + colors.magenta(peripheral.rssi));
 
-		peripheral.connect(function(err) {
-			if (err) console.log(err);
-			else handshake.handshakeSM.connectedToWearable(peripheral, getUserUUID(peripheral));
-		});
+		// if we're connected to the wearable already, handshake with it
+		if (handshake.loggedIn === getUserUUID(peripheral) ||
+				socket.getLoginData().id === getUserUUID(peripheral)) {
+			peripheral.connect(function(err) {
+				if (err) console.log(err);
+				else handshake.handshakeSM.connectedToWearable(peripheral, getUserUUID(peripheral));
+			});
+		} else  {
+			// Otherwise display the device as somebody around
+			var peripheralData = {
+				state: "active",
+				lastConnectionTime: parseInt(Date.now()/1000),
+			};
+
+			activePeripherals[getUserUUID(peripheral)] = peripheralData;
+			removePeripheralFromChecking(getUserUUID(peripheral));
+
+			locked = 0;
+			startScanning();
+		}
+
 	} else {
 		locked = 0;
 		startScanning();

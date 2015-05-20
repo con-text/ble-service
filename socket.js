@@ -6,6 +6,7 @@
 // Modules
 var common = require("./common.js");
 var bluetooth = require("./bluetooth.js");
+var handshake = require("./handshake.js");
 
 // Libraries
 var net = require('net');
@@ -152,7 +153,7 @@ server.on('connection', function(socket) {
 				}, 1500);
 			}
 		} else if(payload.request === 'logout') {
-			// Logout ...
+			handshake.loggedIn = "";
 		}
 	});
 

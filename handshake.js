@@ -14,6 +14,8 @@ var crypto = require('crypto');
 var request = require('request');
 var colors = require('colors');
 
+var loggedIn = "";
+
 var handshakeSM = new machina.Fsm( {
 
 	initialize: function( options ) {},
@@ -292,6 +294,8 @@ var handshakeSM = new machina.Fsm( {
 						sid: socket.getLoginData().sid
 					});
 
+					loggedIn = this.wearableID
+
 					socket.resetLoginId();
 				} else if(this.purpose === "file") {
 					socket.sendMessage(common.messageCodes.loginStatus, {
@@ -397,5 +401,6 @@ function decryptBlock(uuid, ciphertext) {
 }
 
 module.exports = {
-  handshakeSM: handshakeSM
+  handshakeSM: handshakeSM,
+	loggedIn: loggedIn
 };
