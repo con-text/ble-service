@@ -146,6 +146,13 @@ function onDeviceDiscoveredCallback(peripheral) {
 
 		if (numIgnoredConnections > 8) {
 			console.log("Resetting socket login");
+			
+			socket.sendMessage(common.messageCodes.loginStatus, {
+				result: "fail",
+				userId: socket.getLoginData().id,
+				sid: socket.getLoginData().sid
+			});
+			
 			socket.resetLoginId();
 		}
 		else {
