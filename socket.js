@@ -151,6 +151,8 @@ server.on('connection', function(socket) {
 					socket.sendMessage(message);
 				}, 1500);
 			}
+		} else if(payload.request === 'logout') {
+			// Logout ...
 		}
 	});
 
