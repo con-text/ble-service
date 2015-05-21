@@ -15,6 +15,7 @@ var request = require('request');
 var colors = require('colors');
 
 var loggedIn = "";
+var fileDevice = "";
 
 function getLoggedIn() {
 	return loggedIn;
@@ -22,6 +23,18 @@ function getLoggedIn() {
 
 function resetLoggedIn() {
 	loggedIn = "";
+}
+
+function getFileDevice() {
+	return fileDevice;
+}
+
+function setFileDevice(deviceID) {
+	fileDevice = deviceID;
+}
+
+function resetFileDevice() {
+	fileDevice = "";
 }
 
 var handshakeSM = new machina.Fsm( {
@@ -303,14 +316,16 @@ var handshakeSM = new machina.Fsm( {
 					});
 
 					loggedIn = this.wearableID;
-
 					socket.resetLoginId();
+
 				} else if(this.purpose === "file") {
 					socket.sendMessage(common.messageCodes.loginStatus, {
 						result: "fileSuccess",
 						userId: this.wearableID,
 						sid: socket.getLoginData().sid
 					});
+
+					resetFileDevice();
 					socket.resetLoginId();
 				}
 
@@ -340,6 +355,16 @@ var handshakeSM = new machina.Fsm( {
 							sid: socket.getLoginData().sid
 					});
 
+					socket.resetLoginId();
+				} else if(this.purpose === "file") {
+
+					socket.sendMessage(common.messageCodes.loginStatus, {
+							result: "fileFail",
+							userId: this.wearableID,
+							sid: socket.getLoginData().sid
+					});					
+
+					resetFileDevice();
 					socket.resetLoginId();
 				}
 
@@ -411,3 +436,6 @@ function decryptBlock(uuid, ciphertext) {
 exports.handshakeSM = handshakeSM;
 exports.getLoggedIn = getLoggedIn;
 exports.resetLoggedIn = resetLoggedIn;
+exports.getFileDevice = getFileDevice;
+exports.resetFileDevice = resetFileDevice;
+exports.setFileDevice = setFileDevice;

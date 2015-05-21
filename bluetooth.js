@@ -141,13 +141,15 @@ function onDeviceDiscoveredCallback(peripheral) {
 	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
 	if ((activePeripherals[getUserUUID(peripheral)] === undefined) ||
 		doesPeripheralNeedChecking(getUserUUID(peripheral)) ||
-		socket.getLoginData().id === getUserUUID(peripheral)) {
+		socket.getLoginData().id === getUserUUID(peripheral) ||
+		handshake.getFileDevice() === getUserUUID(peripheral)) {
 
 		console.log("Found user with UUID: " + getUserUUID(peripheral) + " and signal strength: " + colors.magenta(peripheral.rssi));
 
 		// if we're connected to the wearable already, handshake with it
 		if (handshake.getLoggedIn() === getUserUUID(peripheral) ||
-			socket.getLoginData().id === getUserUUID(peripheral)) {
+			socket.getLoginData().id === getUserUUID(peripheral) ||
+			handshake.getFileDevice() === getUserUUID(peripheral)) {
 
 			stopScanning();
 

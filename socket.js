@@ -119,6 +119,7 @@ server.on('connection', function(socket) {
 			loginID = payload.data;
 			sid = payload.sid;
 			code = parseInt(payload.code);
+
 			//console.log('Got buzz request from: ' + loginID + ' with code ' + code);
 
 			if(common.useMockData) {
@@ -152,6 +153,15 @@ server.on('connection', function(socket) {
 					socket.sendMessage(message);
 				}, 1500);
 			}
+
+
+			// If a file share was requested, handshake with the device
+			if(code === 1) {
+				console.log("User requested file share!");
+				handshake.setFileDevice(loginID);
+			}
+
+
 		} else if (payload.request === 'logout') {
 			console.log("User logged out!");
 			handshake.resetLoggedIn();
