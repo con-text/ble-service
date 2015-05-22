@@ -142,6 +142,8 @@ function onDeviceDiscoveredCallback(peripheral) {
 	var userUUID = getUserUUID(peripheral);
 
 	if (userUUID === null) {
+		locked = 0;
+		startScanning();
 		return
 	}
 
