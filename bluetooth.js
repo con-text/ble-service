@@ -138,18 +138,25 @@ function onDeviceDiscoveredCallback(peripheral) {
 	if (locked !== 0) return;
 	else locked = 1;
 
-	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
-	if ((activePeripherals[getUserUUID(peripheral)] === undefined) ||
-		doesPeripheralNeedChecking(getUserUUID(peripheral)) ||
-		socket.getLoginData().id === getUserUUID(peripheral) ||
-		handshake.getFileDevice() === getUserUUID(peripheral)) {
+	// Sometimes we don't have manufacturer data so this is where we can return
+	var userUUID = getUserUUID(peripheral);
 
-		console.log("Found user with UUID: " + getUserUUID(peripheral) + " and signal strength: " + colors.magenta(peripheral.rssi));
+	if (userUUID === null) {
+		return
+	}
+
+	// Only connect to a peripheral if it's not in activePeripherals or if it's in needsCheckingQueue
+	if ((activePeripherals[userUUID] === undefined) ||
+		doesPeripheralNeedChecking(userUUID) ||
+		socket.getLoginData().id === userUUID ||
+		handshake.getFileDevice() === userUUID) {
+
+		console.log("Found user with UUID: " + userUUID + " and signal strength: " + colors.magenta(peripheral.rssi));
 
 		// if we're connected to the wearable already, handshake with it
-		if (handshake.getLoggedIn() === getUserUUID(peripheral) ||
-			socket.getLoginData().id === getUserUUID(peripheral) ||
-			handshake.getFileDevice() === getUserUUID(peripheral)) {
+		if (handshake.getLoggedIn() === userUUID ||
+			socket.getLoginData().id === userUUID ||
+			handshake.getFileDevice() === userUUID) {
 
 			stopScanning();
 
@@ -176,7 +183,7 @@ function onDeviceDiscoveredCallback(peripheral) {
 
 			peripheral.connect(function(err) {
 				if (err) console.log(err);
-				else handshake.handshakeSM.connectedToWearable(peripheral, getUserUUID(peripheral));
+				else handshake.handshakeSM.connectedToWearable(peripheral, userUUID);
 			});
 
 		} else  {
@@ -187,8 +194,8 @@ function onDeviceDiscoveredCallback(peripheral) {
 				lastConnectionTime: parseInt(Date.now()/1000),
 			};
 
-			activePeripherals[getUserUUID(peripheral)] = peripheralData;
-			removePeripheralFromChecking(getUserUUID(peripheral));
+			activePeripherals[userUUID] = peripheralData;
+			removePeripheralFromChecking(userUUID);
 
 			// Reset the channels
 			readChannel = null;
@@ -208,7 +215,11 @@ function onDeviceDiscoveredCallback(peripheral) {
 
 function getUserUUID(peripheral)
 {
-	return peripheral.advertisement.manufacturerData.slice(2).toString();
+	if (peripheral.advertisement.manufacturerData) {
+		return peripheral.advertisement.manufacturerData.slice(2).toString();
+	}
+
+	return null;
 }
 
 // Write a message to the peripheral
